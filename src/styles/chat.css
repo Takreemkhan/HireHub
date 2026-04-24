@@ -1,0 +1,74 @@
+/* Professional Chat Styling */
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+.chat-container {
+  background: #f9fafb;
+}
+
+.message-bubble {
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  max-width: 70%;
+  word-wrap: break-word;
+}
+
+.message-bubble.self {
+  background: #f97316;
+  color: white;
+  margin-left: auto;
+}
+
+.message-bubble.other {
+  background: #e5e7eb;
+  color: black;
+  margin-right: auto;
+}
+
+input[type="text"] {
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* global.css or component css */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 16px;
+  background: #fff;
+}
+
+.message {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  max-width: 60%;
+  border-radius: 12px;
+}
+
+.message.self {
+  background-color: #ffedd5; /* orange shade */
+  align-self: flex-end;
+}
+
+.message.other {
+  background-color: #e5e7eb; /* gray */
+  align-self: flex-start;
+}
+
+.message-time {
+  font-size: 0.7rem;
+  color: gray;
+  margin-top: 2px;
+}
+
+
+
