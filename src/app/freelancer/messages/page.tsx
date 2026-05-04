@@ -54,7 +54,7 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import ChatPage from "@/app/components/chat/ChatPage";
 
 export default function FreelancerMessagesPage() {
