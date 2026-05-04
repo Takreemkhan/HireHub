@@ -109,7 +109,13 @@ export default function FreelancerMessagesPage() {
 
   return (
     <div className="fixed top-16 inset-x-0 bottom-0 overflow-hidden bg-white z-10">
-      <ChatPage userId={userId} />
+      <Suspense fallback={
+        <div className="flex items-center justify-center h-full">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35]"></div>
+        </div>
+      }>
+        <ChatPage userId={userId} />
+      </Suspense>
     </div>
   );
 }

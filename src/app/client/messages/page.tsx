@@ -70,7 +70,7 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import ChatPage from "@/app/components/chat/ChatPage";
 
 export default function ClientMessagesPage() {
@@ -125,7 +125,13 @@ export default function ClientMessagesPage() {
     // ✅ FIX: fixed position — header (64px) ke neeche se shuru, footer hide karo
     // h-screen nahi use karo — layout mein header aur footer bhi hain
     <div className="fixed top-16 inset-x-0 bottom-0 overflow-hidden bg-white z-10">
-      <ChatPage userId={userId} />
+      <Suspense fallback={
+        <div className="flex items-center justify-center h-full">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35]"></div>
+        </div>
+      }>
+        <ChatPage userId={userId} />
+      </Suspense>
     </div>
   );
 }

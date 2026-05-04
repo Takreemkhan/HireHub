@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Header from "@/components/common/Header";
@@ -40,6 +40,18 @@ const PLAN_ICONS: Record<string, React.ReactNode> = {
 };
 
 export default function FreelancerPlansPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-[#FAFBFC]">
+                <Loader2 className="w-8 h-8 text-[#FF6B35] animate-spin" />
+            </div>
+        }>
+            <FreelancerPlansMain />
+        </Suspense>
+    );
+}
+
+function FreelancerPlansMain() {
     const router = useRouter();
     const { data: session } = useSession();
 
@@ -487,7 +499,7 @@ export default function FreelancerPlansPage() {
                                     {invoices.map((inv, i) => (
                                         <div key={i} className="flex items-start justify-between p-4 bg-white rounded-xl border border-[#E2E8F0]">
                                             <div className="flex items-start gap-3">
-                                                <div className={`w - 9 h - 9 rounded - lg flex items - center justify - center flex - shrink - 0 ${inv.type === 'resume_video_plan' ? 'bg-orange-50' : 'bg-amber-50'
+                                                <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${inv.type === 'resume_video_plan' ? 'bg-orange-50' : 'bg-amber-50'
                                                     } `}>
                                                     <span className="text-base">
                                                         {inv.type === 'resume_video_plan' ? '🎬' : '🪙'}
