@@ -409,6 +409,7 @@ interface FreelancerCardProps {
   id: string | number;
   name: string;
   email?: string;
+  isSavedInitial?: boolean;
   title: string;
   image: string;
   alt: string;
@@ -439,11 +440,40 @@ const FreelancerCard = ({
   verified,
   location,
   responseTime,
+  isSavedInitial = false,
 }: FreelancerCardProps) => {
   const [isHydrated, setIsHydrated] = React.useState(false);
   const router = useRouter();
   const { data: session, status } = useSession();
   const [isHireClicked, setIsHireClicked] = useState(false);
+  const [isSaved, setIsSaved] = useState(isSavedInitial);
+  const [saveLoading, setSaveLoading] = useState(false);
+
+  const handleToggleSave = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!session || status === 'unauthenticated') {
+      router.push('/sign-in-page');
+      return;
+    }
+
+    try {
+      setSaveLoading(true);
+      const res = await fetch('/api/client/saved-freelancers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ freelancerId: id.toString() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsSaved(data.isSaved);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaveLoading(false);
+    }
+  };
 
   React.useEffect(() => {
     setIsHydrated(true);
@@ -493,8 +523,19 @@ const FreelancerCard = ({
     router.push(`/client/messages?${params.toString()}`);
   };
   return (
-    <div className="bg-card rounded-xl border border-border hover:shadow-brand-lg transition-all duration-300 overflow-hidden group">
+    <div className="bg-card rounded-xl border border-border hover:shadow-brand-lg transition-all duration-300 overflow-hidden group relative">
       <div className="p-6">
+        <button
+          onClick={handleToggleSave}
+          disabled={saveLoading}
+          className="absolute top-4 right-4 text-gray-400 hover:text-[#FF6B35] transition duration-300 disabled:opacity-50 z-10"
+          aria-label="Save freelancer"
+        >
+          <svg className={`w-6 h-6 transition-colors ${isSaved ? "text-[#FF6B35] fill-current" : ""}`} fill={isSaved ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={isSaved ? 1 : 2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+          </svg>
+        </button>
+
         <div className="flex items-start gap-4 mb-4">
           <div className="relative flex-shrink-0">
             <div className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-border group-hover:ring-primary transition-all duration-300">
@@ -511,7 +552,7 @@ const FreelancerCard = ({
             )}
           </div>
 
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 pr-10">
             <h3 className="text-lg font-display font-bold text-foreground mb-1 truncate">
               {name}
             </h3>
@@ -592,14 +633,14 @@ const FreelancerCard = ({
             <span>Hire  </span>
           </button>
 
-          {/* <button
+          <button
             type="button"
             onClick={handleContact}
             disabled={!isHydrated}
             className="px-4 py-2.5 bg-muted text-foreground rounded-lg font-display font-semibold hover:bg-accent hover:text-accent-foreground transition-all duration-300 flex items-center justify-center disabled:opacity-50"
           >
             <Icon name="ChatBubbleLeftRightIcon" size={20} />
-          </button> */}
+          </button>
         </div>
       </div>
     </div>

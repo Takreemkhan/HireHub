@@ -80,7 +80,7 @@ export async function GET(req) {
 
         // "This Month Spent"
         const thisMonthTx = await db.collection("wallet_transactions").find({
-            $or: [{ clientId: userId, userId: userId }, { userId: auth.userId.toString() }],
+            $or: [{ userId: userId }, { userId: auth.userId.toString() }],
             type: "debit",
             status: "completed",
             category: "milestone_payment",

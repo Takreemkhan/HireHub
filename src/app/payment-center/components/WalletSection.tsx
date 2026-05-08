@@ -300,8 +300,8 @@ export default function WalletSection() {
                                     ))
                                 ) : (
                                     [
-                                        { label: isFreelancer ? 'This Month' : 'Spending (Month)', value: `₹${(isFreelancer ? stats?.thisMonthEarnings : stats?.thisMonthSpent || 0).toLocaleString('en-IN')}`, icon: 'ArrowTrendingUpIcon' },
-                                        { label: isFreelancer ? 'Total Earned' : 'Total Added', value: `₹${(isFreelancer ? (stats?.totalEarnings || stats?.totalAdded) : stats?.totalAdded || 0).toLocaleString('en-IN')}`, icon: 'BanknotesIcon' },
+                                        { label: isFreelancer ? 'This Month' : 'Spending (Month)', value: `₹${((isFreelancer ? stats?.thisMonthAdded : stats?.thisMonthSpent) || 0).toLocaleString('en-IN')}`, icon: 'ArrowTrendingUpIcon' },
+                                        { label: isFreelancer ? 'Total Earned' : 'Total Added', value: `₹${(stats?.totalAdded || 0).toLocaleString('en-IN')}`, icon: 'BanknotesIcon' },
                                         { label: 'Total Spent', value: `₹${(stats?.totalSpent || 0).toLocaleString('en-IN')}`, icon: 'ShoppingCartIcon' },
                                     ].map(s => (
                                         <div key={s.label} className="bg-white/10 rounded-xl p-3 backdrop-blur-sm">

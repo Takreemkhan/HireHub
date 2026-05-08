@@ -376,6 +376,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef } from 'react';
+import { useSession } from 'next-auth/react';
 import FreelancerCard from './FreelancerCard';
 import FilterSidebar from './FilterSidebar';
 import SearchBar from './SearchBar';
@@ -425,71 +426,74 @@ interface PaginationInfo {
 
 // FilterSidebar skill IDs → canonical skill name
 const SKILL_ID_TO_NAME: Record<string, string> = {
-  'react':  'React',
+  'react': 'React',
   'nodejs': 'Node.js',
   'python': 'Python',
-  'figma':  'Figma',
-  'seo':    'SEO',
+  'figma': 'Figma',
+  'seo': 'SEO',
 };
 
 // Availability IDs → display labels
 const AVAIL_ID_TO_LABEL: Record<string, string> = {
-  'now':   'Available Now',
-  'week':  'Within a Week',
+  'now': 'Available Now',
+  'week': 'Within a Week',
   'month': 'Within a Month',
 };
 
 function mapProfile(profile: any): Freelancer {
   const skills: Skill[] = Array.isArray(profile.skills)
     ? profile.skills.map((s: any) =>
-        typeof s === 'string'
-          ? { name: s, level: 'Expert' as const }
-          : { name: s.name || String(s), level: (s.level as any) || 'Expert' }
-      )
+      typeof s === 'string'
+        ? { name: s, level: 'Expert' as const }
+        : { name: s.name || String(s), level: (s.level as any) || 'Expert' }
+    )
     : [];
 
   return {
     id: profile.userId || profile._id || '',
-    name:              profile.name || 'Unknown',
-    title:             profile.title || 'Freelancer',
-    image:             profile.image || profile.profileImage || '/default-avatar.png',
-    alt:               `${profile.name || 'Freelancer'} profile photo`,
-    hourlyRate:        Number(profile.hourlyRate) || 0,
-    rating:            Number(profile.rating) || 0,
-    reviewCount:       Array.isArray(profile.reviews) ? profile.reviews.length : 0,
+    name: profile.name || 'Unknown',
+    title: profile.title || 'Freelancer',
+    image: profile.image || profile.profileImage || null,
+    alt: `${profile.name || 'Freelancer'} profile photo`,
+    hourlyRate: Number(profile.hourlyRate) || 0,
+    rating: (Array.isArray(profile.reviews) && profile.reviews.length === 0) ? 0 : Number(profile.rating) || 0,
+    reviewCount: Array.isArray(profile.reviews) ? profile.reviews.length : 0,
     completedProjects: profile.completedJobs || 0,
     skills,
-    availability:      profile.availability || 'Available Now',
-    verified:          profile.verified || false,
-    location:          profile.location || profile.contactInfo?.location || 'Remote',
-    responseTime:      profile.responseTime || '1 hour',
+    availability: profile.availability || 'Available Now',
+    verified: profile.verified || false,
+    location: profile.location || profile.contactInfo?.location || 'Remote',
+    responseTime: profile.responseTime || '1 hour',
   };
 }
 
 const LIMIT = 9;
 
 const FreelancerProfilesInteractive = () => {
-  const [isHydrated, setIsHydrated]   = React.useState(false);
-  const [view, setView]               = React.useState<'grid' | 'list'>('grid');
+  const [isHydrated, setIsHydrated] = React.useState(false);
+  const [view, setView] = React.useState<'grid' | 'list'>('grid');
   const [currentPage, setCurrentPage] = React.useState(1);
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [sortBy, setSortBy]           = React.useState('recommended');
-  const [filters, setFilters]         = React.useState<FilterState>({
-    categories:   [],
-    skills:       [],
-    priceRange:   [0, 200],
+  const [sortBy, setSortBy] = React.useState('recommended');
+  const [filters, setFilters] = React.useState<FilterState>({
+    categories: [],
+    skills: [],
+    priceRange: [0, 200],
     availability: [],
-    rating:       0,
-    verified:     false,
+    rating: 0,
+    verified: false,
   });
 
   // Master list — ALL profiles from API, never filtered at fetch time
   const [allProfiles, setAllProfiles] = React.useState<Freelancer[]>([]);
-  const [loading, setLoading]         = React.useState(false);
-  const [error, setError]             = React.useState<string | null>(null);
-  const hasFetched                    = useRef(false);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const hasFetched = useRef(false);
 
   useEffect(() => { setIsHydrated(true); }, []);
+
+  const { data: session, status: sessionStatus } = useSession();
+  const [savedIds, setSavedIds] = React.useState<Set<string>>(new Set());
 
   // ─── Fetch ALL profiles once on mount (no search/filter params) ──────────────
   // Reason: the backend does NOT search the `name` field, so passing a search
@@ -503,7 +507,7 @@ const FreelancerProfilesInteractive = () => {
     setError(null);
 
     try {
-      const res  = await fetch('/api/freelancer/profile?limit=500');
+      const res = await fetch('/api/freelancer/profile?limit=500');
       const data = await res.json();
 
       if (!data.success) throw new Error(data.message || 'Failed to fetch profiles');
@@ -518,9 +522,27 @@ const FreelancerProfilesInteractive = () => {
     }
   }, []);
 
+  const fetchSavedFreelancers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/client/saved-freelancers?idsOnly=true');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.ids)) {
+        setSavedIds(new Set(data.ids));
+      }
+    } catch (err) {
+      console.error("Failed to fetch saved IDs", err);
+    }
+  }, []);
+
   useEffect(() => {
     if (isHydrated) fetchAllProfiles();
   }, [isHydrated, fetchAllProfiles]);
+
+  useEffect(() => {
+    if (sessionStatus === "authenticated") {
+      fetchSavedFreelancers();
+    }
+  }, [sessionStatus, fetchSavedFreelancers]);
 
   // ─── Client-side: search + filter + sort + paginate ──────────────────────────
   const { pageItems, pagination } = React.useMemo(() => {
@@ -531,13 +553,13 @@ const FreelancerProfilesInteractive = () => {
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       list = list.filter(f =>
-        f.name.toLowerCase().includes(q)  ||
+        f.name.toLowerCase().includes(q) ||
         f.title.toLowerCase().includes(q) ||
         f.skills.some(s => s.name.toLowerCase().includes(q))
       );
     }
 
-        if (filters.categories.length > 0) {
+    if (filters.categories.length > 0) {
       const selectedCats = filters.categories.map((c: string) => c.toLowerCase());
       list = list.filter(f =>
         selectedCats.some(cat => f.title.toLowerCase().includes(cat))
@@ -601,20 +623,20 @@ const FreelancerProfilesInteractive = () => {
     }
 
     // ── 8. Paginate ─────────────────────────────────────────────────────────────
-    const total      = list.length;
+    const total = list.length;
     const totalPages = Math.max(1, Math.ceil(total / LIMIT));
-    const safePage   = Math.min(currentPage, totalPages);
-    const start      = (safePage - 1) * LIMIT;
+    const safePage = Math.min(currentPage, totalPages);
+    const start = (safePage - 1) * LIMIT;
 
     return {
       pageItems: list.slice(start, start + LIMIT),
       pagination: {
         total,
-        page:       safePage,
-        limit:      LIMIT,
+        page: safePage,
+        limit: LIMIT,
         totalPages,
-        hasNext:    safePage < totalPages,
-        hasPrev:    safePage > 1,
+        hasNext: safePage < totalPages,
+        hasPrev: safePage > 1,
       } as PaginationInfo,
     };
   }, [allProfiles, searchQuery, filters, sortBy, currentPage]);
@@ -628,17 +650,17 @@ const FreelancerProfilesInteractive = () => {
   }, [searchQuery, filters, sortBy]);
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
-  const handleSearch       = (query: string) => setSearchQuery(query);
-  const handleSortChange   = (sort: string)  => setSortBy(sort);
-  const handleViewChange   = (v: 'grid' | 'list') => setView(v);
+  const handleSearch = (query: string) => setSearchQuery(query);
+  const handleSortChange = (sort: string) => setSortBy(sort);
+  const handleViewChange = (v: 'grid' | 'list') => setView(v);
   const handleFilterChange = (newFilters: FilterState) => setFilters(newFilters);
-  const handlePageChange   = (page: number) => {
+  const handlePageChange = (page: number) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const startIdx = pagination.total === 0 ? 0 : (pagination.page - 1) * LIMIT + 1;
-  const endIdx   = Math.min(pagination.page * LIMIT, pagination.total);
+  const endIdx = Math.min(pagination.page * LIMIT, pagination.total);
 
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -745,7 +767,7 @@ const FreelancerProfilesInteractive = () => {
             {!loading && !error && pageItems.length > 0 && (
               <div className={`grid gap-6 mb-8 ${view === 'grid' ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1'}`}>
                 {pageItems.map((freelancer) => (
-                  <FreelancerCard key={freelancer.id} {...freelancer} />
+                  <FreelancerCard key={freelancer.id} {...freelancer} isSavedInitial={savedIds.has(String(freelancer.id))} />
                 ))}
               </div>
             )}
@@ -773,11 +795,10 @@ const FreelancerProfilesInteractive = () => {
                       <button
                         key={page}
                         onClick={() => handlePageChange(page)}
-                        className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
-                          currentPage === page
-                            ? 'bg-primary text-primary-foreground'
-                            : 'border border-border hover:bg-muted text-foreground'
-                        }`}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${currentPage === page
+                          ? 'bg-primary text-primary-foreground'
+                          : 'border border-border hover:bg-muted text-foreground'
+                          }`}
                       >
                         {page}
                       </button>

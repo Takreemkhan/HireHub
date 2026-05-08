@@ -42,8 +42,8 @@ const EarningsDashboard = () => {
   }, []);
 
   const stats = [
-    { label: 'Total Earnings', value: `₹${(statsData?.totalEarnings || 0).toLocaleString('en-IN')}`, change: '+12.5%', icon: 'CurrencyDollarIcon', color: 'text-brand-green' },
-    { label: 'This Month', value: `₹${(statsData?.thisMonthEarnings || 0).toLocaleString('en-IN')}`, change: '+16.0%', icon: 'TrendingUpIcon', color: 'text-brand-blue' },
+    { label: 'Total Earnings', value: `₹${(statsData?.totalAdded || 0).toLocaleString('en-IN')}`, change: '+12.5%', icon: 'CurrencyDollarIcon', color: 'text-brand-green' },
+    { label: 'This Month', value: `₹${(statsData?.thisMonthAdded || 0).toLocaleString('en-IN')}`, change: '+16.0%', icon: 'TrendingUpIcon', color: 'text-brand-blue' },
     { label: 'Avg. Project Value', value: `₹${(Math.round(statsData?.avgProjectValue || 0)).toLocaleString('en-IN')}`, change: '+8.3%', icon: 'ChartBarIcon', color: 'text-accent' },
     { label: 'Active Projects', value: statsData?.activeProjectsCount || '0', change: '+2', icon: 'BriefcaseIcon', color: 'text-brand-coral' },
   ];

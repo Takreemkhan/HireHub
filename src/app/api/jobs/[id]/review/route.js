@@ -49,6 +49,40 @@ export async function POST(req, { params }) {
             { $set: { [updateField]: reviewData, updatedAt: now } }
         );
 
+        // Update Freelancer Profile if Client is Reviewing
+        if (isClient && job.freelancerId) {
+            const freelancerProfile = await db.collection("profiles").findOne({
+                userId: new ObjectId(job.freelancerId),
+                role: "freelancer"
+            });
+
+            if (freelancerProfile) {
+                const existingReviews = freelancerProfile.reviews || [];
+
+                const newReview = {
+                    jobId: jobId.toString(),
+                    clientId: auth.userId,
+                    rating: Number(rating),
+                    comment: review?.trim() || "",
+                    reviewedAt: now,
+                };
+
+                const updatedReviews = [...existingReviews, newReview];
+                const totalRating = updatedReviews.reduce((sum, r) => sum + r.rating, 0);
+                const averageRating = totalRating / updatedReviews.length;
+
+                await db.collection("profiles").updateOne(
+                    { _id: freelancerProfile._id },
+                    {
+                        $set: {
+                            rating: parseFloat(averageRating.toFixed(1)),
+                            reviews: updatedReviews
+                        }
+                    }
+                );
+            }
+        }
+
         return NextResponse.json({ success: true, message: "Review submitted. Thank you!" });
     } catch (error) {
         console.error("Submit review error:", error);

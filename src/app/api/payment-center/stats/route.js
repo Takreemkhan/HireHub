@@ -24,11 +24,9 @@ export async function GET(req) {
             $or: [{ userId }, { userId: auth.userId }]
         }).toArray();
 
-        // Calculate credits (deposits) - ONLY those that affected wallet (topups or marked source:wallet)
+        // Calculate credits (Earnings) - all completed credits for the freelancer
         const totalAdded = allTx.reduce((sum, tx) => {
-            const isWalletCredit = tx.type === "credit" && tx.status === "completed" &&
-                (tx.source === "wallet" || tx.category === "topup");
-            return isWalletCredit ? sum + (tx.amount || 0) : sum;
+            return (tx.type === "credit" && tx.status === "completed") ? sum + (tx.amount || 0) : sum;
         }, 0);
 
         // Calculate debits (spending) - strictly COMPLETED wallet debits

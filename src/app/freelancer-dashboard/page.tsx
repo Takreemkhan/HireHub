@@ -288,7 +288,7 @@ function FreelancerDashboardInner({ id }: { id: string }) {
 
                 <div className="flex items-center gap-1 mb-4">
                   {[...Array(5)].map((_, i) => (
-                    <Star key={i} size={14} className="fill-yellow-400 text-yellow-400" />
+                    <Star key={i} size={14} className={i < Math.round(Number(freelancer.rating) || 0) ? "fill-yellow-400 text-yellow-400" : "fill-gray-200 text-gray-200"} />
                   ))}
                 </div>
 
@@ -308,7 +308,7 @@ function FreelancerDashboardInner({ id }: { id: string }) {
                     <div className="flex items-center justify-center gap-2 mb-1">
                       <Clock size={16} className="text-[#1B365D]" />
                       <p className="text-2xl font-bold text-[#1A1D23]">
-                        {freelancer.hourlyRate || '0'}
+                        {freelancer.totalHours || '0'}
                       </p>
                     </div>
                     <p className="text-xs text-[#6B7280]">Total Hours</p>

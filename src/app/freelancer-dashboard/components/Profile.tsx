@@ -540,9 +540,7 @@ const emptyProfileData: ProfileData = {
   name: "", title: "", location: "", hourlyRate: 0, availability: "Available now",
   bio: "", skills: [],
   languages: [
-    { name: "English", level: "Native", width: "100%" },
-    { name: "Spanish", level: "Fluent", width: "85%" },
-    { name: "Mandarin", level: "Basic", width: "30%" },
+    { name: "English", level: "Native", width: "100%" }
   ],
   experience: [],
   education: [],
@@ -1323,9 +1321,14 @@ export default function Profile({ onProfileImageChange }: ProfileProps = {}) {
                           {isEditing ? (
                             <>
                               <input value={lang.name} onChange={(e) => { const u = [...data.languages]; u[idx] = { ...lang, name: e.target.value }; update("languages", u); }} className="border border-blue-200 rounded px-1.5 py-0.5 text-xs w-20 focus:outline-none bg-blue-50" />
-                              <select value={lang.level} onChange={(e) => { const u = [...data.languages]; u[idx] = { ...lang, level: e.target.value }; update("languages", u); }} className="border border-blue-200 rounded px-1.5 py-0.5 text-xs focus:outline-none bg-blue-50">
-                                <option>Native</option><option>Fluent</option><option>Intermediate</option><option>Basic</option>
-                              </select>
+                              <div className="flex items-center gap-1">
+                                <select value={lang.level} onChange={(e) => { const u = [...data.languages]; u[idx] = { ...lang, level: e.target.value }; update("languages", u); }} className="border border-blue-200 rounded px-1.5 py-0.5 text-xs focus:outline-none bg-blue-50">
+                                  <option>Native</option><option>Fluent</option><option>Intermediate</option><option>Basic</option>
+                                </select>
+                                <button type="button" onClick={() => update("languages", data.languages.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-red-400 transition" aria-label="Remove language">
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                              </div>
                             </>
                           ) : (
                             <><span className="text-gray-600">{lang.name}</span><span className="font-semibold" style={{ color: "#1B365D" }}>{lang.level}</span></>

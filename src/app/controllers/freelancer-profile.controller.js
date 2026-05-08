@@ -60,40 +60,59 @@ export const getFreelancerProfile = async (userId) => {
   const client = await clientPromise;
   const db = client.db(DB_NAME);
 
-  const profile = await db.collection(COLLECTIONS.PROFILES).findOne({
-    userId: new ObjectId(userId),
-    role: "freelancer"
-  });
+  let profile = null;
+  let userObjectId;
 
-
-  if (!profile) {
+  try {
+    userObjectId = new ObjectId(userId);
+  } catch (e) {
     return null;
   }
 
-  // Get user basic info
-  const user = await db.collection(COLLECTIONS.USERS).findOne({
-    _id: new ObjectId(userId)
+  profile = await db.collection(COLLECTIONS.PROFILES).findOne({
+    userId: userObjectId,
+    role: "freelancer"
   });
 
-  // Get completed jobs count
-  const completedJobs = await db.collection(COLLECTIONS.JOBS).countDocuments({
-    freelancerId: new ObjectId(userId),
+  // Get user basic info (always needed for name/image)
+  const user = await db.collection(COLLECTIONS.USERS).findOne({ _id: userObjectId });
+
+  if (!profile && !user) return null;
+
+  // Get completed jobs (with details)
+  const completedJobsList = await db.collection(COLLECTIONS.JOBS).find({
+    freelancerId: userObjectId,
     status: "completed"
-  });
+  }, {
+    projection: { title: 1, createdAt: 1, updatedAt: 1, description: 1, budget: 1 }
+  }).limit(20).toArray();
 
-  // Get active projects count
-  const activeProjects = await db.collection(COLLECTIONS.JOBS).countDocuments({
-    freelancerId: new ObjectId(userId),
+  // Get active/in-progress jobs (with details)
+  const activeJobsList = await db.collection(COLLECTIONS.JOBS).find({
+    freelancerId: userObjectId,
     status: "in-progress"
-  });
+  }, {
+    projection: { title: 1, createdAt: 1, updatedAt: 1, description: 1 }
+  }).limit(20).toArray();
 
   return {
-    ...profile,
-    name: user?.name || profile.name,
-    email: user?.email || profile.email,
-    image: user?.image || profile.profileImage,      // Fallback to profileImage
-    completedJobs,
-    activeProjects
+    ...(profile || {}),
+    name: user?.name || profile?.name || "Unknown",
+    email: user?.email || profile?.email,
+    image: profile?.profileImage || user?.image || null,
+    profileImage: profile?.profileImage || user?.image || null,
+    completedJobs: completedJobsList.length,
+    activeProjects: activeJobsList.length,
+    completedJobsList: completedJobsList.map(j => ({
+      title: j.title || "Completed Project",
+      dateRange: j.updatedAt ? new Date(j.updatedAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "",
+      feedback: ""
+    })),
+    activeJobsList: activeJobsList.map(j => ({
+      title: j.title || "Ongoing Project",
+      startDate: j.createdAt ? new Date(j.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "",
+      description: j.description || ""
+    }))
   };
 };
 
@@ -426,49 +445,78 @@ export const getAllFreelancerProfiles = async (page = 1, limit = 20, filters = {
   const db = client.db(DB_NAME);
 
   const skip = (page - 1) * limit;
-  const query = { role: "freelancer" };
-  console.log("Filters received in getAllFreelancerProfiles:", filters);
-  // Apply filters
+  const userQuery = { role: "freelancer", isDeleted: { $ne: true } };
+
+  // Note: Since we want ALL freelancers from USERS table, we start with USERS
+  // and left join PROFILES.
+
+  const pipeline = [
+    { $match: userQuery },
+    {
+      $lookup: {
+        from: COLLECTIONS.PROFILES,
+        localField: "_id",
+        foreignField: "userId",
+        as: "profile"
+      }
+    },
+    { $unwind: { path: "$profile", preserveNullAndEmptyArrays: true } },
+    {
+      $project: {
+        userId: { $toString: "$_id" },
+        name: 1,
+        email: 1,
+        profileImage: { $ifNull: ["$profile.profileImage", "$image", ""] },
+        title: { $ifNull: ["$profile.title", "Freelancer"] },
+        hourlyRate: { $ifNull: ["$profile.hourlyRate", 0] },
+        rating: { $ifNull: ["$profile.rating", 0] },
+        completedJobs: { $ifNull: ["$profile.completedJobs", 0] },
+        activeProjects: { $ifNull: ["$profile.activeProjects", 0] },
+        reviews: { $ifNull: ["$profile.reviews", []] },
+        skills: { $ifNull: ["$profile.skills", []] },
+        location: { $ifNull: ["$profile.location", "Remote"] },
+        responseTime: { $ifNull: ["$profile.responseTime", "1 hour"] },
+        about: { $ifNull: ["$profile.about", ""] },
+        verified: { $ifNull: ["$profile.verified", false] },
+        updatedAt: { $ifNull: ["$profile.updatedAt", "$createdAt"] }
+      }
+    }
+  ];
+
+  // Apply filters to the projected results
+  const matchFilter = {};
   if (filters.skills && filters.skills.length > 0) {
-    query.skills = { $in: filters.skills };
+    matchFilter.skills = { $in: filters.skills };
   }
-
-  if (filters.title && filters.title.length > 0) {
-    query.$or = filters.title.map((t) => ({
-      title: { $regex: t, $options: "i" }
-    }));
-  }
-
-  if (filters.minRate) {
-    query.hourlyRate = { $gte: Number(filters.minRate) };
-  }
-
-  if (filters.maxRate) {
-    query.hourlyRate = { ...query.hourlyRate, $lte: Number(filters.maxRate) };
-  }
-
-  if (filters.location) {
-    query.location = { $regex: filters.location, $options: "i" };
-  }
-
   if (filters.search) {
-    query.$or = [
+    matchFilter.$or = [
+      { name: { $regex: filters.search, $options: "i" } },
       { title: { $regex: filters.search, $options: "i" } },
       { about: { $regex: filters.search, $options: "i" } },
       { skills: { $in: [new RegExp(filters.search, "i")] } }
     ];
   }
+  if (filters.minRate) matchFilter.hourlyRate = { $gte: Number(filters.minRate) };
+  if (filters.maxRate) matchFilter.hourlyRate = { ...matchFilter.hourlyRate, $lte: Number(filters.maxRate) };
+  if (filters.location) matchFilter.location = { $regex: filters.location, $options: "i" };
 
+  if (Object.keys(matchFilter).length > 0) {
+    pipeline.push({ $match: matchFilter });
+  }
 
-  const [profiles, total] = await Promise.all([
-    db.collection(COLLECTIONS.PROFILES)
-      .find(query)
-      .sort({ rating: -1, completedJobs: -1, updatedAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .toArray(),
-    db.collection(COLLECTIONS.PROFILES).countDocuments(query)
+  // Count total matching
+  const countPipeline = [...pipeline, { $count: "total" }];
+  const [profiles, countResult] = await Promise.all([
+    db.collection(COLLECTIONS.USERS).aggregate([
+      ...pipeline,
+      { $sort: { rating: -1, completedJobs: -1, updatedAt: -1 } },
+      { $skip: skip },
+      { $limit: limit }
+    ]).toArray(),
+    db.collection(COLLECTIONS.USERS).aggregate(countPipeline).toArray()
   ]);
+
+  const total = countResult[0]?.total || 0;
 
   return {
     profiles,

@@ -9,6 +9,7 @@ import DraftSection from './components/DraftSection';
 import OverviewSection from './components/OverviewSection';
 import CurrentJobsSection from './components/CurrentJobsSection';
 import CompletedJobsSection from './components/CompletedJobsSection';
+import SavedFreelancersSection from './components/SavedFreelancersSection';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PanelLeft, X } from 'lucide-react';
 // Import settings components
@@ -119,6 +120,7 @@ function ClientDashboardInner() {
 
   const sidebarItems = [
     { label: 'Overview', value: 'overview' },
+    { label: 'Saved Freelancers', value: 'saved' },
     { label: 'Completed Jobs', value: 'completed' },
     { label: 'Current Jobs', value: 'current' },
     { label: 'Draft', value: 'draft' },
@@ -156,6 +158,8 @@ function ClientDashboardInner() {
     switch (activeSection) {
       case 'overview':
         return <OverviewSection />;
+      case 'saved':
+        return <SavedFreelancersSection />;
       case 'draft':
         return <DraftSection />;
       case 'current':
@@ -316,8 +320,8 @@ function ClientDashboardInner() {
                       )
                     }
                     <div className="flex items-center gap-1 mb-4">
-                      {[...Array(mockClient.rating)].map((_, i) => (
-                        <Star key={i} size={14} className="fill-yellow-400 text-yellow-400" />
+                      {[...Array(5)].map((_, i) => (
+                        <Star key={i} size={14} className={i < Math.round(Number((mockClients as any)?.rating || 0)) ? "fill-yellow-400 text-yellow-400" : "fill-gray-200 text-gray-200"} />
                       ))}
                     </div>
 

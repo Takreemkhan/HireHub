@@ -40,7 +40,7 @@ export const getFreelancerCurrentJobs = async (freelancerId, page = 1, limit = 1
   const enhancedJobs = await Promise.all(
     jobs.map(async (job) => {
       const clientId = toObjectId(job.clientId);
-      
+
       const clientUser = await db.collection(COLLECTIONS.USERS).findOne({
         $or: [
           { _id: clientId },
@@ -49,7 +49,7 @@ export const getFreelancerCurrentJobs = async (freelancerId, page = 1, limit = 1
       });
 
       // Calculate days since started
-      const daysSinceStart = job.startedAt 
+      const daysSinceStart = job.startedAt
         ? Math.ceil((new Date() - new Date(job.startedAt)) / (1000 * 60 * 60 * 24))
         : 0;
 
@@ -66,7 +66,22 @@ export const getFreelancerCurrentJobs = async (freelancerId, page = 1, limit = 1
       };
     })
   );
-console.log("current jobs ",jobs)
+  console.log("current jobs ", jobs)
+  // Calculate stats for avg completion
+  const completedJobsCount = await db.collection(COLLECTIONS.JOBS).countDocuments({
+    $or: [{ freelancerId: freelancerObjId }, { freelancerId: freelancerId.toString() }],
+    status: "completed"
+  });
+
+  const totalAssignedJobsCount = await db.collection(COLLECTIONS.JOBS).countDocuments({
+    $or: [{ freelancerId: freelancerObjId }, { freelancerId: freelancerId.toString() }],
+    status: { $in: ["completed", "in-progress", "under-review"] }
+  });
+
+  const avgCompletion = totalAssignedJobsCount > 0
+    ? Math.round((completedJobsCount / totalAssignedJobsCount) * 100)
+    : 0;
+
   return {
     jobs: enhancedJobs,
     pagination: {
@@ -79,7 +94,8 @@ console.log("current jobs ",jobs)
     },
     stats: {
       totalCurrent: total,
-      totalEarning: jobs.reduce((sum, job) => sum + (job.budget || 0), 0)
+      totalEarning: jobs.reduce((sum, job) => sum + (job.budget || 0), 0),
+      avgCompletion
     }
   };
 };
@@ -114,7 +130,7 @@ export const getFreelancerCompletedJobs = async (freelancerId, page = 1, limit =
   const enhancedJobs = await Promise.all(
     jobs.map(async (job) => {
       const clientId = toObjectId(job.clientId);
-      
+
       const clientUser = await db.collection(COLLECTIONS.USERS).findOne({
         $or: [
           { _id: clientId },
@@ -160,7 +176,7 @@ export const getFreelancerCompletedJobs = async (freelancerId, page = 1, limit =
       averageDuration: enhancedJobs.reduce((sum, job) => sum + (job.durationInDays || 0), 0) / total || 0,
       averageRating: enhancedJobs
         .filter(j => j.clientReview?.rating)
-        .reduce((sum, job) => sum + job.clientReview.rating, 0) / 
+        .reduce((sum, job) => sum + job.clientReview.rating, 0) /
         enhancedJobs.filter(j => j.clientReview?.rating).length || 0
     }
   };
@@ -214,7 +230,7 @@ export const getAvailableJobsForFreelancer = async (freelancerId, page = 1, limi
   const enhancedJobs = await Promise.all(
     jobs.map(async (job) => {
       const clientId = toObjectId(job.clientId);
-      
+
       const [clientUser, hasApplied, proposalCount] = await Promise.all([
         db.collection(COLLECTIONS.USERS).findOne({
           $or: [
@@ -283,14 +299,14 @@ export const submitJobForCompletion = async (jobId, freelancerId, submissionData
 
   const result = await db.collection(COLLECTIONS.JOBS).findOneAndUpdate(
     { _id: new ObjectId(jobId) },
-    { 
-      $set: { 
+    {
+      $set: {
         submittedForReview: true,
         submittedAt: new Date(),
         submissionNotes: submissionData.notes || null,
         deliverables: submissionData.deliverables || [],
         updatedAt: new Date()
-      } 
+      }
     },
     { returnDocument: "after" }
   );
@@ -325,22 +341,22 @@ export const addFreelancerReviewForClient = async (jobId, freelancerId, reviewDa
 
   const result = await db.collection(COLLECTIONS.JOBS).findOneAndUpdate(
     { _id: new ObjectId(jobId) },
-    { 
-      $set: { 
+    {
+      $set: {
         freelancerReview: {
           rating: reviewData.rating,
           comment: reviewData.comment,
           reviewedAt: new Date()
         },
         updatedAt: new Date()
-      } 
+      }
     },
     { returnDocument: "after" }
   );
 
   // Update client rating
   const clientId = toObjectId(job.clientId);
-  
+
   const clientJobs = await db.collection(COLLECTIONS.JOBS).find({
     $or: [
       { clientId: clientId },
@@ -355,7 +371,7 @@ export const addFreelancerReviewForClient = async (jobId, freelancerId, reviewDa
     const avgRating = totalRating / clientJobs.length;
 
     await db.collection(COLLECTIONS.USERS).updateOne(
-      { 
+      {
         $or: [
           { _id: clientId },
           { _id: job.clientId.toString() }
@@ -400,8 +416,8 @@ export const getJobDetailsForFreelancer = async (jobId, freelancerId) => {
   const duration = job.completedAt && job.startedAt
     ? Math.ceil((new Date(job.completedAt) - new Date(job.startedAt)) / (1000 * 60 * 60 * 24))
     : job.startedAt
-    ? Math.ceil((new Date() - new Date(job.startedAt)) / (1000 * 60 * 60 * 24))
-    : null;
+      ? Math.ceil((new Date() - new Date(job.startedAt)) / (1000 * 60 * 60 * 24))
+      : null;
 
   return {
     ...job,

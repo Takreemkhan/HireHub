@@ -216,16 +216,16 @@ const Header = ({ className = "" }: HeaderProps) => {
             ) : (
               <>
                 <Link href="/sign-in-page">
-                  <button className="hidden lg:flex items-center space-x-2 px-5 py-2.5 bg-brand-blue text-white rounded-lg font-display font-semibold hover:bg-opacity-90 transition-all duration-300 shadow-sm hover:shadow-md">
+                  <div className="hidden lg:flex items-center space-x-2 px-5 py-2.5 bg-brand-blue text-white rounded-lg font-display font-semibold hover:bg-opacity-90 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer">
                     <Icon name="ArrowRightOnRectangleIcon" size={20} />
                     <span>Sign In</span>
-                  </button>
+                  </div>
                 </Link>
                 <Link href="/sign-up-page">
-                  <button className="hidden lg:flex items-center space-x-2 px-5 py-2.5 bg-brand-cta text-white rounded-lg font-display font-semibold hover:bg-opacity-90 transition-all duration-300 shadow-sm hover:shadow-md">
+                  <div className="hidden lg:flex items-center space-x-2 px-5 py-2.5 bg-brand-cta text-white rounded-lg font-display font-semibold hover:bg-opacity-90 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer">
                     <span>Get Started</span>
                     <Icon name="ArrowRightIcon" size={20} />
-                  </button>
+                  </div>
                 </Link>
               </>
             )}
@@ -304,16 +304,16 @@ const Header = ({ className = "" }: HeaderProps) => {
               ) : (
                 <>
                   <Link href="/sign-in-page">
-                    <button className="w-full flex items-center justify-center space-x-2 px-5 py-3 bg-brand-blue text-white rounded-lg font-display font-semibold hover:bg-opacity-90 transition-all duration-300 shadow-sm">
+                    <div className="w-full flex items-center justify-center space-x-2 px-5 py-3 bg-brand-blue text-white rounded-lg font-display font-semibold hover:bg-opacity-90 transition-all duration-300 shadow-sm cursor-pointer">
                       <Icon name="ArrowRightOnRectangleIcon" size={20} />
                       <span>Sign In</span>
-                    </button>
+                    </div>
                   </Link>
                   <Link href="/sign-up-page">
-                    <button className="w-full flex items-center justify-center space-x-2 px-5 py-3 bg-brand-cta text-white rounded-lg font-display font-semibold hover:bg-opacity-90 transition-all duration-300 shadow-sm">
+                    <div className="w-full flex items-center justify-center space-x-2 px-5 py-3 bg-brand-cta text-white rounded-lg font-display font-semibold hover:bg-opacity-90 transition-all duration-300 shadow-sm cursor-pointer">
                       <span>Get Started</span>
                       <Icon name="ArrowRightIcon" size={20} />
-                    </button>
+                    </div>
                   </Link>
                 </>
               )}

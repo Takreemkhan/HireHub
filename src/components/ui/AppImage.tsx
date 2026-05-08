@@ -33,59 +33,46 @@ function AppImage({
     fill = false,
     sizes,
     onClick,
-    fallbackSrc = '/assets/images/no_image.png',
+    fallbackSrc,
     ...props
 }: AppImageProps) {
-    const [imageSrc, setImageSrc] = useState(src);
-    const [isLoading, setIsLoading] = useState(true);
     const [hasError, setHasError] = useState(false);
 
-    // More reliable external URL detection
-    const isExternal = imageSrc.startsWith('http://') || imageSrc.startsWith('https://');
-    const isLocal = imageSrc.startsWith('/') || imageSrc.startsWith('./') || imageSrc.startsWith('data:');
-
     const handleError = () => {
-        if (!hasError && imageSrc !== fallbackSrc) {
-            setImageSrc(fallbackSrc);
-            setHasError(true);
-        }
-        setIsLoading(false);
+        setHasError(true);
     };
 
-    const handleLoad = () => {
-        setIsLoading(false);
-        setHasError(false);
-    };
+    // If no src, or image errored, show initials avatar
+    if (!src || hasError) {
+        const initial = alt ? alt[0]?.toUpperCase() : '?';
+        return (
+            <div
+                className={`${className} bg-gradient-to-br from-[#1B365D] to-[#2E5984] flex items-center justify-center`}
+                onClick={onClick}
+                style={fill ? { position: 'absolute', inset: 0 } : { width, height }}
+            >
+                <span className="text-white font-bold text-2xl">{initial}</span>
+            </div>
+        );
+    }
 
-    const commonClassName = `${className} ${isLoading ? 'bg-gray-200' : ''} ${onClick ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`;
+    const isExternal = src.startsWith('http://') || src.startsWith('https://');
+    const isDataUrl = src.startsWith('data:');
 
-    // For external URLs or when in doubt, use regular img tag
-    if (isExternal && !isLocal) {
-        const imgStyle: React.CSSProperties = {};
-
-        if (width) imgStyle.width = width;
-        if (height) imgStyle.height = height;
-
-      if (fill) {
-    return (
-        <img
-            src="https://images.pexels.com/photos/3184357/pexels-photo-3184357.jpeg?cs=srgb&dl=pexels-fauxels-3184357.jpg&fm=jpg"
-            alt={alt}
-            fill
-            sizes={sizes || '100vw'}
-            className={commonClassName}
-            style={{ objectFit: 'cover' }}
-        />
-    );
-}
+    // For external URLs or data URLs, use plain img tag for reliability
+    if (isExternal || isDataUrl) {
+        const imgStyle: React.CSSProperties = fill
+            ? { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }
+            : {};
+        if (!fill && width) imgStyle.width = width;
+        if (!fill && height) imgStyle.height = height;
 
         return (
             <img
-                src="https://images.pexels.com/photos/3184357/pexels-photo-3184357.jpeg?cs=srgb&dl=pexels-fauxels-3184357.jpg&fm=jpg"
+                src={src}
                 alt={alt}
-                className={commonClassName}
+                className={className}
                 onError={handleError}
-                onLoad={handleLoad}
                 onClick={onClick}
                 style={imgStyle}
                 {...props}
@@ -93,30 +80,21 @@ function AppImage({
         );
     }
 
-    // For local images and data URLs, use Next.js Image component
-    const imageProps = {
-        src: imageSrc,
-        alt,
-        className: commonClassName,
-        priority,
-        quality,
-        placeholder,
-        blurDataURL,
-        unoptimized: true,
-        onError: handleError,
-        onLoad: handleLoad,
-        onClick,
-        ...props,
-    };
-
+    // For local images, use Next.js Image
     if (fill) {
         return (
             <div className={`relative ${className}`}>
                 <Image
-                    {...imageProps}
+                    src={src}
+                    alt={alt}
                     fill
                     sizes={sizes || '100vw'}
                     style={{ objectFit: 'cover' }}
+                    priority={priority}
+                    unoptimized
+                    onError={handleError}
+                    onClick={onClick}
+                    {...props}
                 />
             </div>
         );
@@ -124,11 +102,19 @@ function AppImage({
 
     return (
         <Image
-            {...imageProps}
+            src={src}
+            alt={alt}
             width={width || 400}
             height={height || 300}
+            className={className}
+            priority={priority}
+            unoptimized
+            onError={handleError}
+            onClick={onClick}
+            {...props}
         />
     );
 }
 
 export default AppImage;
+

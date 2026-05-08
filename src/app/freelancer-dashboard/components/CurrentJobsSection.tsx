@@ -302,7 +302,7 @@ export default function CurrentJobsSection() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [stats, setStats] = useState({ totalCurrent: 0, totalEarning: 0 });
+  const [stats, setStats] = useState({ totalCurrent: 0, totalEarning: 0, avgCompletion: 0 });
 
   useEffect(() => {
     fetchJobs();
@@ -340,8 +340,8 @@ export default function CurrentJobsSection() {
       job.clientInfo.name.toLowerCase().includes(searchQuery.toLowerCase());
     const statusFilter = filterStatus === "all" ? true :
       (filterStatus === "review" ? job.submittedForReview :
-       filterStatus === "in-progress" ? (!job.submittedForReview && job.status === "in-progress") :
-       filterStatus === "pending" ? false : true); // pending not applicable
+        filterStatus === "in-progress" ? (!job.submittedForReview && job.status === "in-progress") :
+          filterStatus === "pending" ? false : true); // pending not applicable
     return matchesSearch && statusFilter;
   });
 
@@ -397,7 +397,7 @@ export default function CurrentJobsSection() {
                 </svg>
               </div>
             </div>
-            <p className="text-3xl font-bold text-[#1A1D23]">58%</p>
+            <p className="text-3xl font-bold text-[#1A1D23]">{stats.avgCompletion || 0}%</p>
             <p className="text-sm text-[#6B7280] mt-2">Across all jobs</p>
           </div>
         </div>
