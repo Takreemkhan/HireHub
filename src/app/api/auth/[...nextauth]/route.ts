@@ -104,6 +104,8 @@ export const authOptions = {
 
       if (user) {
         token.id = user.id;
+        token.name = user.name;
+        token.email = user.email;
 
         const dbUser = await db.collection("users").findOne({
           _id: new ObjectId(user.id),
@@ -131,6 +133,8 @@ export const authOptions = {
     async session({ session, token }: any) {
       if (session.user) {
         session.user.id = token.id as string;
+        session.user.name = token.name as string;
+        session.user.email = token.email as string;
         session.user.role = (token.role as string | null) ?? undefined;
       }
       return session;

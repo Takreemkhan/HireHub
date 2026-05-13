@@ -440,6 +440,22 @@ const AVAIL_ID_TO_LABEL: Record<string, string> = {
   'month': 'Within a Month',
 };
 
+// Helper to consolidate fragmented titles into professional categories
+const getCanonicalCategory = (title: string): string => {
+  const t = title.toLowerCase().trim();
+  if (t.includes('mern')) return 'MERN Stack';
+  if (t.includes('full stack') || t.includes('full-stack') || t.includes('fullstack')) return 'Full-Stack Development';
+  if (t.includes('frontend') || t.includes('front-end')) return 'Frontend Development';
+  if (t.includes('backend') || t.includes('back-end')) return 'Backend Development';
+  if (t.includes('mobile') || t.includes('ios') || t.includes('android')) return 'Mobile Development';
+  if (t.includes('design') || t.includes('ui/ux') || t.includes('graphic')) return 'Design & Creative';
+  if (t.includes('data') || t.includes('machine learning') || t.includes('ml') || t.includes('ai')) return 'Data Science & AI';
+  if (t.includes('junior')) return 'Junior Developer';
+  if (t.includes('senior')) return 'Senior Developer';
+  // Fallback: Capitalize first letters
+  return title.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+};
+
 function mapProfile(profile: any): Freelancer {
   const skills: Skill[] = Array.isArray(profile.skills)
     ? profile.skills.map((s: any) =>
@@ -545,7 +561,7 @@ const FreelancerProfilesInteractive = () => {
   }, [sessionStatus, fetchSavedFreelancers]);
 
   // ─── Client-side: search + filter + sort + paginate ──────────────────────────
-  const { pageItems, pagination } = React.useMemo(() => {
+  const { pageItems, pagination, categoryCounts, skillCounts } = React.useMemo(() => {
     let list = [...allProfiles];
 
     // ── 1. Search (name, title, skills) ────────────────────────────────────────
@@ -562,7 +578,7 @@ const FreelancerProfilesInteractive = () => {
     if (filters.categories.length > 0) {
       const selectedCats = filters.categories.map((c: string) => c.toLowerCase());
       list = list.filter(f =>
-        selectedCats.some(cat => f.title.toLowerCase().includes(cat))
+        selectedCats.includes(getCanonicalCategory(f.title).toLowerCase())
       );
     }
 
@@ -627,6 +643,27 @@ const FreelancerProfilesInteractive = () => {
     const totalPages = Math.max(1, Math.ceil(total / LIMIT));
     const safePage = Math.min(currentPage, totalPages);
     const start = (safePage - 1) * LIMIT;
+    const catCounts: Record<string, number> = {};
+    const skCounts: Record<string, number> = {};
+
+    allProfiles.forEach(f => {
+      // Categories
+      const cat = getCanonicalCategory(f.title);
+      catCounts[cat] = (catCounts[cat] || 0) + 1;
+
+      // Skills
+      f.skills.forEach(s => {
+        let name = typeof s === 'string' ? s : (s as any).name || '';
+        if (!name) return;
+        
+        let key = name.trim().toLowerCase();
+        
+        // Canonicalize Node.js variations
+        if (key.includes('node')) key = 'node';
+        
+        skCounts[key] = (skCounts[key] || 0) + 1;
+      });
+    });
 
     return {
       pageItems: list.slice(start, start + LIMIT),
@@ -638,6 +675,8 @@ const FreelancerProfilesInteractive = () => {
         hasNext: safePage < totalPages,
         hasPrev: safePage > 1,
       } as PaginationInfo,
+      categoryCounts: catCounts,
+      skillCounts: skCounts
     };
   }, [allProfiles, searchQuery, filters, sortBy, currentPage]);
 
@@ -684,7 +723,11 @@ const FreelancerProfilesInteractive = () => {
 
           {/* Sidebar */}
           <div className="lg:w-80 flex-shrink-0">
-            <FilterSidebar onFilterChange={handleFilterChange} />
+            <FilterSidebar 
+              onFilterChange={handleFilterChange} 
+              categoryCounts={categoryCounts}
+              skillCounts={skillCounts}
+            />
           </div>
 
           {/* Main */}

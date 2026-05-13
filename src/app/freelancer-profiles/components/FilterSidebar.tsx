@@ -320,6 +320,8 @@ interface FilterOption {
 
 interface FilterSidebarProps {
   onFilterChange: (filters: FilterState) => void;
+  categoryCounts?: Record<string, number>;
+  skillCounts?: Record<string, number>;
 }
 
 interface FilterState {
@@ -340,53 +342,62 @@ const DEFAULT_FILTERS: FilterState = {
   verified: false,
 };
 
-const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
+const FilterSidebar = ({ onFilterChange, categoryCounts, skillCounts }: FilterSidebarProps) => {
   const [isHydrated, setIsHydrated] = React.useState(false);
   const [isExpanded, setIsExpanded] = React.useState(true);
   const [filters, setFilters] = React.useState<FilterState>(DEFAULT_FILTERS);
   React.useEffect(() => { setIsHydrated(true); }, []);
 
+  const { data: dataCategories } = useFreelancerCategories();
 
-  const { data, isLoading } = useProfile({
-    title: "",
-    skills: [""],
+  const categories = React.useMemo(() => {
+    if (!dataCategories?.categories) return [];
+    return dataCategories.categories.map((cat: any) => ({
+      ...cat,
+      count: categoryCounts?.[cat.label] || 0
+    }));
+  }, [dataCategories, categoryCounts]);
 
-  });
-  const { data: dataCategories, isLoading: Categoriesloading, error } = useFreelancerCategories();
+  const dynamicTopSkills = React.useMemo(() => {
+    const rawSkills = dataCategories?.topSkills || [
+      { id: 'react', label: 'React' },
+      { id: 'node', label: 'Node' },
+      { id: 'python', label: 'Python' },
+      { id: 'figma', label: 'Figma' },
+      { id: 'seo', label: 'SEO' },
+    ];
 
+    // Unique-ify and canonicalize
+    const seen = new Set();
+    const baseSkills = rawSkills.map((s: any) => {
+      let label = s.label;
+      let id = s.id;
+      
+      // Canonicalize Node
+      if (label.toLowerCase().includes('node')) {
+        label = 'Node';
+        id = 'node';
+      }
+      
+      return { ...s, id, label };
+    }).filter((s: any) => {
+      const key = s.label.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
-  const list = data?.profiles || [];
-
-  const filteredProfiles = list.filter((profile: any) => {
-    if (profile.title === undefined || profile.title === null || profile.title !== "") {
-      return profile
-    }
-
-  })
-
-
-  // list.map((profile: any) => { 
-  //    console.log("Profile title :", profile.title);
-  // });
-  // console.log("Fetched profiles with filters:", data, "Loading:", isLoading);
-  // ─── Options ────────────────────────────────────────────────────────────────
-  // const categories: FilterOption[] = [
-  //   { id: 'web-dev',    label: 'Web Development ',  count: 1247 },
-  //   { id: 'mobile-dev', label: 'Mobile Development', count: 856 },
-  //   { id: 'design',     label: 'Design & Creative', count: 2134 },
-  //   { id: 'writing',    label: 'Writing & Content', count: 1523 },
-  //   { id: 'marketing',  label: 'Digital Marketing', count: 987 },
-  //   { id: 'data',       label: 'Data Science',      count: 654 },
-  // ];
-
-  // IDs must match the SKILL_ID_TO_NAME map in FreelancerProfilesInteractive
-  const topSkills: FilterOption[] = [
-    { id: 'react', label: 'React', count: 892 },
-    { id: 'nodejs', label: 'Node.js', count: 743 },
-    { id: 'python', label: 'Python', count: 1021 },
-    { id: 'figma', label: 'Figma', count: 567 },
-    { id: 'seo', label: 'SEO', count: 432 },
-  ];
+    return baseSkills.map((s: any) => {
+      let countKey = s.label.toLowerCase();
+      // Ensure we use 'node' for any node variations
+      if (countKey.includes('node')) countKey = 'node';
+      
+      return {
+        ...s,
+        count: skillCounts?.[countKey] || 0
+      };
+    });
+  }, [dataCategories, skillCounts]);
 
   const availabilityOptions: FilterOption[] = [
     { id: 'now', label: 'Available Now' },
@@ -394,7 +405,6 @@ const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
     { id: 'month', label: 'Within a Month' },
   ];
 
-  // ─── Generic toggle helper ────────────────────────────────────────────────────
   const toggle = <K extends 'categories' | 'skills' | 'availability'>(
     key: K,
     id: string,
@@ -408,6 +418,8 @@ const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
     setFilters(updated);
     onFilterChange(updated);
   };
+
+
 
   const update = (partial: Partial<FilterState>) => {
     if (!isHydrated) return;
@@ -479,7 +491,9 @@ const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
                   />
                   <span className="text-sm text-foreground">{cat.label}</span>
                 </div>
-                <span className="text-xs text-muted-foreground">{cat.count}</span>
+                {filters.categories.includes(cat.label) && (
+                  <span className="text-xs text-muted-foreground">{cat.count}</span>
+                )}
               </label>
             ))}
           </div>
@@ -494,7 +508,7 @@ const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
             )}
           </div>
           <div className="space-y-2">
-            {topSkills.map((skill) => (
+            {dynamicTopSkills.map((skill: any) => (
               <label
                 key={skill.id}
                 className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
@@ -509,7 +523,9 @@ const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
                   />
                   <span className="text-sm text-foreground">{skill.label}</span>
                 </div>
-                <span className="text-xs text-muted-foreground">{skill.count}</span>
+                {filters.skills.includes(skill.id) && (
+                  <span className="text-xs text-muted-foreground">{skill.count}</span>
+                )}
               </label>
             ))}
           </div>

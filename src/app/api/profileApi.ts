@@ -310,6 +310,19 @@ export const getClientDrafts = async () => {
   return res.json();
 }
 
+export const getClientCompletedJobs = async (page = 1, limit = 10) => {
+  const res = await fetch(`/api/client/jobs/completed?page=${page}&limit=${limit}`, {
+    method: "GET",
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch completed jobs");
+  }
+
+  return res.json();
+};
+
 
 
 export const ContactsInfoEdit = async ({ userId, data }: { userId: string; data: any }) => {

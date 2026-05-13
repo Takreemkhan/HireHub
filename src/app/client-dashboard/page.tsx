@@ -24,7 +24,7 @@ import CardSkeleton from '@/components/Loader/Loader';
 
 const mockClient = {
   id: 1,
-  name: 'Sarah Chen 1',
+  name: 'Sarah Chen',
   image: 'https://img.rocket.new/generatedImages/rocket_gen_img_10d60e496-1763295319842.png',
   location: 'San Francisco, CA',
   completedProjects: 89,
@@ -95,12 +95,11 @@ function ClientDashboardInner() {
     }
   }, [searchParams, router]);
 
-  const getInitials = (name: string) => {
-    const names = name.split(' ');
-    if (names.length >= 2) {
-      return (names[0][0] + names[names.length - 1][0]).toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
+  const getInitials = (name?: string | null) => {
+    if (!name) return "U";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
 
   const getInitialsColor = (name: string) => {
@@ -193,6 +192,7 @@ function ClientDashboardInner() {
   const [bitsRemaining, setBitsRemaining] = useState<number | null>(null);
   const [bitsTotal, setBitsTotal] = useState<number | null>(null);
   const [planLabel, setPlanLabel] = useState<string>('Free');
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     const fetchMembership = async () => {
@@ -290,25 +290,25 @@ function ClientDashboardInner() {
                 <div className="p-6 border-b border-[#E2E8F0]">
                   <div className="flex flex-col items-center text-center">
                     <div className="relative mb-4">
-
-                      <div
-                        className={`w-20 h-20 rounded-full ${getInitialsColor(displayName)} flex items-center justify-center text-white text-2xl font-bold shadow-md`}
-                      >
-                        {getInitials(displayName)}
-                      </div>
-
+                      {session?.user?.image && !imageError ? (
+                        <img
+                          src={session.user.image}
+                          alt=""
+                          onError={() => setImageError(true)}
+                          className="w-20 h-20 rounded-full object-cover shadow-md border-2 border-white"
+                        />
+                      ) : (
+                        <div
+                          className={`w-20 h-20 rounded-full ${getInitialsColor(displayName)} flex items-center justify-center text-white text-2xl font-bold shadow-md`}
+                        >
+                          {getInitials(displayName)}
+                        </div>
+                      )}
                       <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full" />
                     </div>
-                    {/* Initials Circle */}
-                    {/* <div className="relative mb-4">
-                  <div className={`w-20 h-20 rounded-full ${getInitialsColor(mockClient.name)} flex items-center justify-center text-white text-2xl font-bold shadow-md`}>
-                    {getInitials(mockClients?.name || "")}
-                  </div>
-                  <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full" />
-                </div> */}
 
                     <h2 className="text-xl font-bold text-[#1A1D23] mb-1">
-                      {mockClients?.name}
+                      {displayName}
                     </h2>
 
                     {

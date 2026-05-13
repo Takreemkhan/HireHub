@@ -879,6 +879,7 @@ function PostJobContent() {
   const searchParams = useSearchParams();
   const draftId = searchParams.get("draftId");
   const [loading, setLoading] = useState(false);
+  const [isDraftLoading, setIsDraftLoading] = useState(false);
   const [walletLoading, setWalletLoading] = useState(false);
   const [splitLoading, setSplitLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1189,6 +1190,7 @@ function PostJobContent() {
     if (!draftId) return;
     const fetchDraft = async () => {
       try {
+        setIsDraftLoading(true);
         const res = await fetch(`/api/jobs/drafts/${draftId}`);
         const data = await res.json();
         if (res.ok && data.draft) {
@@ -1209,6 +1211,8 @@ function PostJobContent() {
         }
       } catch (err) {
         console.error("Failed to load draft:", err);
+      } finally {
+        setIsDraftLoading(false);
       }
     };
     fetchDraft();
@@ -1464,8 +1468,62 @@ function PostJobContent() {
 
           <hr className="my-8" />
 
-          {/* CATEGORY */}
-          <section className="mb-12">
+          {isDraftLoading ? (
+            <div className="space-y-12 animate-in fade-in duration-500">
+              {/* Category Skeleton */}
+              <section>
+                <div className="h-6 w-64 bg-gray-200 rounded mb-6 animate-pulse" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div>
+                    <div className="h-4 w-20 bg-gray-200 rounded mb-2 animate-pulse" />
+                    <div className="h-14 w-full bg-gray-100 rounded-lg animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="h-4 w-24 bg-gray-200 rounded mb-2 animate-pulse" />
+                    <div className="h-14 w-full bg-gray-100 rounded-lg animate-pulse" />
+                  </div>
+                </div>
+              </section>
+
+              {/* Job Title Skeleton */}
+              <section>
+                <div className="h-4 w-20 bg-gray-200 rounded mb-2 animate-pulse" />
+                <div className="h-14 w-full bg-gray-100 rounded-lg animate-pulse" />
+              </section>
+
+              {/* Job Description Skeleton */}
+              <section>
+                <div className="h-4 w-28 bg-gray-200 rounded mb-2 animate-pulse" />
+                <div className="h-48 w-full bg-gray-100 rounded-lg animate-pulse" />
+              </section>
+
+              {/* Budget Skeleton */}
+              <section>
+                <div className="h-4 w-16 bg-gray-200 rounded mb-4 animate-pulse" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="h-14 w-full bg-gray-100 rounded-lg animate-pulse" />
+                  <div className="h-14 w-full bg-gray-100 rounded-lg animate-pulse" />
+                  <div className="h-14 w-full bg-gray-100 rounded-lg animate-pulse" />
+                </div>
+              </section>
+
+              {/* Duration Skeleton */}
+              <section>
+                <div className="h-4 w-48 bg-gray-200 rounded mb-2 animate-pulse" />
+                <div className="h-14 w-full bg-gray-100 rounded-lg animate-pulse" />
+              </section>
+
+              {/* Actions Skeleton */}
+              <div className="flex justify-end gap-4 pt-4">
+                <div className="h-14 w-40 bg-gray-100 rounded-lg animate-pulse" />
+                <div className="h-14 w-40 bg-gray-100 rounded-lg animate-pulse" />
+                <div className="h-14 w-40 bg-gray-100 rounded-lg animate-pulse" />
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* CATEGORY */}
+              <section className="mb-12">
             <p className="text-base md:text-lg text-gray-700 mb-6">
               Choose a category that best fits your job.
             </p>
@@ -2017,9 +2075,11 @@ function PostJobContent() {
               {loading ? "Processing..." : "Post job"}
             </button>
           </div>
+        </>
+      )}
 
-        </div>
-      </div >
+    </div>
+  </div >
       <FooterSection />
       {/* MODALS */}
       {

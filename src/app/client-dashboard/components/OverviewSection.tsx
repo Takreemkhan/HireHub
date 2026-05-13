@@ -1,17 +1,22 @@
 'use client';
 
 import { useRouter } from "next/navigation";
-import { usegetAllFreelancerProfiles, useGetClientDrafts } from "@/app/hook/useProfile";
+import { usegetAllFreelancerProfiles, useGetClientDrafts, useCompletedJobs } from "@/app/hook/useProfile";
 import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import CardSkeleton from "@/components/Loader/Loader";
+import { useSession } from "next-auth/react";
 export default function OverviewSection() {
   const router = useRouter();
 
+  const { data: session } = useSession();
   const { data: freelancerProfiles, isLoading, error } = usegetAllFreelancerProfiles();
-    const { data: drafts, isLoading: draftsLoading, error: draftsError } = useGetClientDrafts();
+  const { data: drafts, isLoading: draftsLoading, error: draftsError } = useGetClientDrafts();
+  const { data: completedJobsData } = useCompletedJobs(1, 1);
+  const userName = session?.user?.name?.split(' ')[0] || "User";
   const freelancerProfilesData = freelancerProfiles?.profiles?.slice(0, 4) || [];
+  const lastCompletedJob = completedJobsData?.jobs?.[0];
 
   // ── Bits widget (mirrors freelancer Bids widget 1-to-1) ──────────────────
   const [bitsRemaining, setBitsRemaining] = useState<number | null>(null);
@@ -93,7 +98,7 @@ const draftsData = drafts?.drafts?.slice(0, 1) || [];
 
         {/* HEADER */}
         <div className="flex justify-between items-center">
-          <h2 className="font-bold text-[#1A1D23] text-3xl">Welcome back 👋</h2>
+          <h2 className="font-bold text-[#1A1D23] text-3xl">Welcome back, {userName} 👋</h2>
         </div>
 
         {/* ── BITS WIDGET (mirrors freelancer Bits widget 1-to-1) ────────── */}
@@ -146,9 +151,9 @@ const draftsData = drafts?.drafts?.slice(0, 1) || [];
         <section>
           <h3 className="font-semibold text-[#1A1D23] mb-6 text-2xl">Overview</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {
-              draftsData.map((draft: any) => {
-                return <div key={draft._id} className="border border-[#E2E8F0] rounded-xl p-6 bg-white shadow-sm hover:shadow-md transition-shadow">
+            {draftsData.length > 0 ? (
+              draftsData.map((draft: any) => (
+                <div key={draft._id} className="border border-[#E2E8F0] rounded-xl p-6 bg-white shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-start gap-3 mb-4">
                     <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
                       <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -158,7 +163,7 @@ const draftsData = drafts?.drafts?.slice(0, 1) || [];
                     <div className="flex-1">
                       <p className="text-xs font-medium text-blue-600 mb-1 uppercase tracking-wide">Draft job post</p>
                       <p className="font-semibold text-[#1A1D23] text-lg mb-2">
-                        {draft.subCategory}
+                        {draft.title || draft.subCategory || "Untitled Draft"}
                       </p>
                     </div>
                   </div>
@@ -166,13 +171,30 @@ const draftsData = drafts?.drafts?.slice(0, 1) || [];
                   <button
                     type="button"
                     className="w-full border-2 border-[#1B365D] text-[#1B365D] font-semibold text-sm py-3 rounded-lg hover:bg-[#1B365D] hover:text-white transition-all duration-200"
-                    onClick={() => router.push(`/client-dashboard?view=draft`)}
+                    onClick={() => router.push(`/post-page?draftId=${draft._id}`)}
                   >
                     view
                   </button>
                 </div>
-              })
-            }
+              ))
+            ) : (
+              <div className="border border-[#E2E8F0] rounded-xl p-6 bg-white shadow-sm flex flex-col items-center justify-center text-center">
+                <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center mb-3">
+                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <p className="text-sm font-semibold text-[#1A1D23] mb-1">No drafts yet</p>
+                <p className="text-xs text-[#6B7280] mb-5">Save your job posts as drafts to finish them later.</p>
+                <button
+                  onClick={() => router.push("/post-page")}
+                  className="w-full border-2 border-gray-200 text-gray-400 font-semibold text-sm py-3 rounded-lg cursor-not-allowed"
+                  disabled
+                >
+                  view
+                </button>
+              </div>
+            )}
 
             <div
               onClick={() => router.push("/post-page")}
@@ -190,30 +212,59 @@ const draftsData = drafts?.drafts?.slice(0, 1) || [];
           </div>
         </section>
 
-        {/* WORK AGAIN */}
         <section>
           <h3 className="font-semibold text-[#1A1D23] mb-6 text-2xl">Work together again on something new</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="border border-[#E2E8F0] rounded-xl p-6 bg-white shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center gap-4 mb-5">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-lg">JE</div>
-                <div>
-                  <p className="font-semibold text-[#1A1D23] text-base">Jackstone E.</p>
-                  <p className="text-sm text-[#6B7280]">Kenya</p>
+            {lastCompletedJob ? (
+              <div className="border border-[#E2E8F0] rounded-xl p-6 bg-white shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-4 mb-5">
+                  <div className={`w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-lg`}>
+                    {getInitials(lastCompletedJob.freelancerInfo?.name || 'Anonymous')}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[#1A1D23] text-base">{lastCompletedJob.freelancerInfo?.name}</p>
+                    <p className="text-sm text-[#6B7280]">{lastCompletedJob.freelancerInfo?.location}</p>
+                  </div>
                 </div>
+                <div className="flex gap-8 mb-5">
+                  <div>
+                    <p className="text-2xl font-bold text-[#1A1D23]">{lastCompletedJob.freelancerInfo?.completedJobs || 0}</p>
+                    <p className="text-xs text-[#6B7280]">Jobs</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-[#1A1D23]">${lastCompletedJob.freelancerInfo?.hourlyRate || 0}/hr</p>
+                    <p className="text-xs text-[#6B7280]">Rate</p>
+                  </div>
+                </div>
+                <div className="bg-[#F7FAFC] rounded-lg p-4 mb-5">
+                  <p className="text-xs text-[#6B7280] mb-1">Last contract together:</p>
+                  <p className="text-sm text-[#1A1D23] font-medium">{lastCompletedJob.description}</p>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => router.push(`/freelancer-profile/${lastCompletedJob.freelancerId}`)}
+                  className="w-full border-2 border-[#1B365D] text-[#1B365D] font-semibold text-sm py-3 rounded-lg hover:bg-[#1B365D] hover:text-white transition-all duration-200"
+                >
+                  Rehire
+                </button>
               </div>
-              <div className="flex gap-8 mb-5">
-                <div><p className="text-2xl font-bold text-[#1A1D23]">50</p><p className="text-xs text-[#6B7280]">Jobs</p></div>
-                <div><p className="text-2xl font-bold text-[#1A1D23]">$30/hr</p><p className="text-xs text-[#6B7280]">Rate</p></div>
+            ) : (
+              <div className="border border-[#E2E8F0] rounded-xl p-6 bg-white shadow-sm flex flex-col items-center justify-center text-center">
+                <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mb-4">
+                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <p className="font-semibold text-[#1A1D23] mb-2">No past collaborators yet</p>
+                <p className="text-sm text-[#6B7280] mb-6 max-w-[200px]">Once you complete a job, your freelancer will appear here for easy rehiring.</p>
+                <button 
+                  disabled
+                  className="w-full border-2 border-gray-100 text-gray-400 font-semibold text-sm py-3 rounded-lg cursor-not-allowed"
+                >
+                  Rehire
+                </button>
               </div>
-              <div className="bg-[#F7FAFC] rounded-lg p-4 mb-5">
-                <p className="text-xs text-[#6B7280] mb-1">Last contract together:</p>
-                <p className="text-sm text-[#1A1D23] font-medium">Need a content writer who can write product title and description.</p>
-              </div>
-              <button type="button" className="w-full border-2 border-[#1B365D] text-[#1B365D] font-semibold text-sm py-3 rounded-lg hover:bg-[#1B365D] hover:text-white transition-all duration-200">
-                Rehire
-              </button>
-            </div>
+            )}
 
             <div className="border border-[#E2E8F0] rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 p-8 flex flex-col items-center justify-center text-center">
               <div className="w-16 h-16 rounded-full bg-white shadow-sm mb-4 flex items-center justify-center">

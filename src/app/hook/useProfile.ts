@@ -19,6 +19,7 @@ import {
   getSavedJobs,
   getProposals,
   getClientDrafts,
+  getClientCompletedJobs,
   ContactsInfoEdit,
   getContactsInfo,
   getResumeVideos,
@@ -218,6 +219,13 @@ export const useGetClientDrafts = () => {
   return useQuery({
     queryKey: ["get-client-drafts"],
     queryFn: getClientDrafts,
+  });
+};
+
+export const useCompletedJobs = (page = 1, limit = 10) => {
+  return useQuery({
+    queryKey: ["completed-jobs", page, limit],
+    queryFn: () => getClientCompletedJobs(page, limit),
   });
 };
 

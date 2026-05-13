@@ -452,7 +452,7 @@ const FreelancerCard = ({
   const handleToggleSave = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!session || status === 'unauthenticated') {
+    if (!session || status !== 'authenticated') {
       router.push('/sign-in-page');
       return;
     }

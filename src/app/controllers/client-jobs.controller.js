@@ -199,12 +199,22 @@ export const getClientCompletedJobs = async (clientId, page = 1, limit = 100) =>
         });
 
         if (freelancer) {
+          const profile = await db.collection(COLLECTIONS.PROFILES).findOne({
+            $or: [
+              { userId: freelancerId },
+              { userId: job.freelancerId.toString() }
+            ]
+          });
+
           freelancerInfo = {
             _id: freelancer._id,
             name: freelancer.name,
             email: freelancer.email,
             image: freelancer.image,
-            rating: freelancer.rating || 0
+            rating: freelancer.rating || 0,
+            hourlyRate: profile?.hourlyRate || 0,
+            completedJobs: profile?.completedJobs || 0,
+            location: profile?.location || freelancer.location || "Unknown"
           };
         }
       }

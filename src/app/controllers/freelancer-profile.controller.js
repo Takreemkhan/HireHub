@@ -535,37 +535,74 @@ export const getAllFreelancerCategories = async () => {
   const client = await clientPromise;
   const db = client.db(DB_NAME);
 
-  // MongoDB aggregation: freelancer profiles group by title + count
-  const categories = await db.collection(COLLECTIONS.PROFILES).aggregate([
-    {
-      // Sirf freelancers jinka title set hai
-      $match: {
-        role: "freelancer",
-        title: { $nin: [null, ""] }
-      }
-    },
-    {
-      // title ke basis pe group karo aur count nikalo
-      $group: {
-        _id: "$title",                  // group by title
-        userId: { $first: "$userId" },  // us title ka pehla userId
-        count: { $sum: 1 } // kitne profiles same title ke hain
-      }
-    },
-    {
-      // Response shape: { id, label, count }
-      $project: {
-        _id: 0,
-        id: "$userId",
-        label: "$_id",
-        count: 1
-      }
-    },
-    {
-      // Sabse zyada count wale pehle
-      $sort: { count: -1 }
-    }
-  ]).toArray();
+  const rawProfiles = await db.collection(COLLECTIONS.PROFILES).find(
+    { role: "freelancer" },
+    { projection: { title: 1, userId: 1, skills: 1 } }
+  ).toArray();
 
-  return { categories };
+  const getCanonicalCategory = (title) => {
+    if (!title) return "Freelancer";
+    const t = title.toLowerCase().trim();
+    if (t.includes('mern')) return 'MERN Stack';
+    if (t.includes('full stack') || t.includes('full-stack') || t.includes('fullstack')) return 'Full-Stack Development';
+    if (t.includes('frontend') || t.includes('front-end')) return 'Frontend Development';
+    if (t.includes('backend') || t.includes('back-end')) return 'Backend Development';
+    if (t.includes('mobile') || t.includes('ios') || t.includes('android')) return 'Mobile Development';
+    if (t.includes('design') || t.includes('ui/ux') || t.includes('graphic')) return 'Design & Creative';
+    if (t.includes('data') || t.includes('machine learning') || t.includes('ml') || t.includes('ai')) return 'Data Science & AI';
+    if (t.includes('junior')) return 'Junior Developer';
+    if (t.includes('senior')) return 'Senior Developer';
+    // Fallback: Capitalize first letters
+    return title.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  };
+
+  const categoryMap = {};
+  const skillMap = {};
+
+  rawProfiles.forEach(p => {
+    // Categories
+    if (p.title) {
+      const canonical = getCanonicalCategory(p.title);
+      if (!categoryMap[canonical]) {
+        categoryMap[canonical] = {
+          id: p.userId.toString(),
+          label: canonical,
+          count: 0
+        };
+      }
+      categoryMap[canonical].count++;
+    }
+
+    // Skills
+    if (Array.isArray(p.skills)) {
+      p.skills.forEach(skill => {
+        let skillName = "";
+        if (typeof skill === 'string') {
+          skillName = skill;
+        } else if (skill && typeof skill === 'object') {
+          skillName = skill.name || skill.label || "";
+        }
+
+        if (skillName) {
+          const canonicalSkill = skillName.trim();
+          if (!skillMap[canonicalSkill]) {
+            skillMap[canonicalSkill] = {
+              id: canonicalSkill.toLowerCase().replace(/\s+/g, ''),
+              label: canonicalSkill,
+              count: 0
+            };
+          }
+          skillMap[canonicalSkill].count++;
+        }
+      });
+    }
+  });
+
+  const categories = Object.values(categoryMap).sort((a, b) => b.count - a.count);
+  const topSkills = Object.values(skillMap)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 15); // Top 15 skills
+
+  return { categories, topSkills };
 };
+
