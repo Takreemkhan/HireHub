@@ -5,8 +5,7 @@ import { verifyAuth, unauthorizedResponse } from "@/lib/auth.middleware";
 
 /**
  * GET /api/freelancer/plans/invoice
- * Returns the bid purchase history for the logged-in freelancer.
- * Also includes resume video plan payment history.
+ * Returns payment history: Plus plan purchases + bid pack top-ups.
  */
 export async function GET(req) {
     try {
@@ -17,7 +16,20 @@ export async function GET(req) {
         const db = client.db(DB_NAME);
         const userId = new ObjectId(auth.userId);
 
-        // Bid purchase history
+        // Plus plan purchase history (new plan_purchases collection)
+        const planPurchases = await db
+            .collection("plan_purchases")
+            .find({ userId })
+            .sort({ purchasedAt: -1 })
+            .limit(20)
+            .toArray();
+
+        // Legacy: resume_video plan subscription record (backward compat)
+        const legacySub = await db
+            .collection(COLLECTIONS.FREELANCER_SUBSCRIPTIONS)
+            .findOne({ freelancerId: auth.userId });
+
+        // Bid pack top-up history
         const bidPurchases = await db
             .collection("bid_purchases")
             .find({ userId })
@@ -25,28 +37,31 @@ export async function GET(req) {
             .limit(20)
             .toArray();
 
-        // Resume video plan subscription (single record per user)
-        const videoSub = await db
-            .collection(COLLECTIONS.FREELANCER_SUBSCRIPTIONS)
-            .findOne({ freelancerId: auth.userId });
-
         const invoices = [
-            // Video plan as invoice entry if it exists
-            ...(videoSub?.orderId
-                ? [
-                    {
-                        type: "resume_video_plan",
-                        label: `${videoSub.planLabel} Plan – Resume Video`,
-                        amountINR: videoSub.planKey === "basic" ? 499 : videoSub.planKey === "pro" ? 999 : 1999,
-                        orderId: videoSub.orderId,
-                        paymentId: videoSub.paymentId,
-                        purchasedAt: videoSub.planStartDate,
-                        planExpiry: videoSub.planExpiry,
-                    },
-                ]
+            // New plan_purchases entries (Plus plan payments)
+            ...planPurchases.map(p => ({
+                type: "plus_plan",
+                label: `${p.planLabel} Plan – ${p.billingCycle === "yearly" ? "Yearly" : "Monthly"}`,
+                amountUSD: p.amountUSD,
+                bids: p.bids,
+                orderId: p.orderId,
+                paymentId: p.paymentId,
+                purchasedAt: p.purchasedAt,
+                planExpiry: p.planExpiry,
+            })),
+            // Legacy subscription record (if it exists and has an orderId — i.e. was paid)
+            ...(legacySub?.orderId && !planPurchases.some(p => p.orderId === legacySub.orderId)
+                ? [{
+                    type: "plus_plan",
+                    label: `${legacySub.planLabel ?? "Plus"} Plan`,
+                    orderId: legacySub.orderId,
+                    paymentId: legacySub.paymentId,
+                    purchasedAt: legacySub.planStartDate,
+                    planExpiry: legacySub.planExpiry,
+                }]
                 : []),
-            // Bid pack purchases
-            ...bidPurchases.map((p) => ({
+            // Bid pack top-up purchases
+            ...bidPurchases.map(p => ({
                 type: "bid_pack",
                 label: p.packLabel || `${p.bidsAdded} Bids`,
                 bidsAdded: p.bidsAdded,

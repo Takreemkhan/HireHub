@@ -2,7 +2,7 @@
 
 import React, { use, useState, useEffect, useRef, Suspense } from "react";
 import Header from "@/components/common/Header";
-import { MapPin, Star, Briefcase, Clock, PanelLeft, X, Video, ShoppingCart, CheckCircle, AlertCircle } from "lucide-react";
+import { MapPin, Star, Briefcase, Clock, PanelLeft, X, ShoppingCart, Zap, Crown } from "lucide-react";
 import Settings from "./settings/page";
 import CurrentJobsSection from "./components/CurrentJobsSection";
 import CompletedJobsSection from "./components/CompletedJobsSection";
@@ -44,11 +44,10 @@ const getInitialsColor = (name: string) => {
   const index = name.charCodeAt(0) % colors.length;
   return colors[index];
 };
-// Video plan accent colors
-const VIDEO_PLAN_COLORS: Record<string, string> = {
-  basic: '#2E5984',
-  pro: '#FF6B35',
-  elite: '#1B365D',
+// Plan accent colors for Basic & Plus
+const PLAN_COLORS: Record<string, string> = {
+  basic: '#1B365D',
+  plus: '#FF6B35',
 };
 
 // ✅ Inner component — useSearchParams 
@@ -69,11 +68,11 @@ function FreelancerDashboardInner({ id }: { id: string }) {
   const [pendingInvitations, setPendingInvitations] = useState(4);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  // Resume Video Plan state
-  const [videoSub, setVideoSub] = useState<{
-    isPlanActive: boolean; planKey: string | null; planLabel: string | null;
-    maxVideos: number; planExpiry: string | null;
-  }>({ isPlanActive: false, planKey: null, planLabel: null, maxVideos: 0, planExpiry: null });
+  // Subscription plan state (Basic or Plus)
+  const [planInfo, setPlanInfo] = useState<{
+    planKey: string; planLabel: string; billingCycle: string | null;
+    planExpiry: string | null; isPlus: boolean;
+  }>({ planKey: 'basic', planLabel: 'Basic', billingCycle: null, planExpiry: null, isPlus: false });
 
   // Bids state
   const [bidsRemaining, setBidsRemaining] = useState<number | null>(null);
@@ -166,7 +165,22 @@ function FreelancerDashboardInner({ id }: { id: string }) {
           setBidsTotal(bidsData.bidsTotal ?? bidsData.subscription?.bitsTotal ?? 0);
         }
         const plansData = await plansRes.json();
-        if (plansData.success) setVideoSub(plansData.subscription);
+        if (plansData.success) {
+          const sub = plansData.subscription;
+          const now = new Date();
+          const isPlus = sub?.planKey === 'plus' && sub?.isPlanActive &&
+            sub?.planExpiry && new Date(sub.planExpiry) > now;
+          setPlanInfo({
+            planKey: isPlus ? 'plus' : 'basic',
+            planLabel: isPlus ? 'Plus' : 'Basic',
+            billingCycle: sub?.billingCycle ?? null,
+            planExpiry: sub?.planExpiry ?? null,
+            isPlus: !!isPlus,
+          });
+          // Sync bids from plans API too
+          if (sub?.bidsRemaining != null) setBidsRemaining(sub.bidsRemaining);
+          if (sub?.bidsTotal != null) setBidsTotal(sub.bidsTotal);
+        }
       } catch (e) {
         console.error('Dashboard data fetch error:', e);
       }
@@ -315,7 +329,7 @@ function FreelancerDashboardInner({ id }: { id: string }) {
                   </div>
                 </div>
 
-                {/* ── Resume Video Plan Widget ─────────────────────────── */}
+                {/* ── Subscription Plan Widget (Basic / Plus) ──────────── */}
                 <div
                   onClick={handleVideoPlansClick}
                   className="w-full mb-3 p-4 rounded-xl border border-[#E2E8F0] bg-white cursor-pointer hover:border-[#FF6B35] hover:shadow-sm transition"
@@ -324,37 +338,41 @@ function FreelancerDashboardInner({ id }: { id: string }) {
                     <div className="flex items-center gap-2">
                       <div
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-white"
-                        style={{ backgroundColor: videoSub.isPlanActive ? (VIDEO_PLAN_COLORS[videoSub.planKey ?? 'basic'] ?? '#FF6B35') : '#9CA3AF' }}
+                        style={{ backgroundColor: PLAN_COLORS[planInfo.planKey] ?? '#1B365D' }}
                       >
-                        <Video className="w-4 h-4" />
+                        {planInfo.isPlus ? <Crown className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
                       </div>
                       <div>
-                        <p className="text-xs text-gray-400">Resume Video</p>
-                        <p className="text-sm font-semibold text-[#1A1D23]">
-                          {videoSub.isPlanActive ? `${videoSub.planLabel} Plan` : 'No Active Plan'}
-                        </p>
+                        <p className="text-xs text-gray-400">Subscription</p>
+                        <p className="text-sm font-semibold text-[#1A1D23]">{planInfo.planLabel} Plan</p>
                       </div>
                     </div>
-                    {videoSub.isPlanActive
-                      ? <CheckCircle className="w-4 h-4 text-green-500" />
-                      : <AlertCircle className="w-4 h-4 text-orange-400" />}
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      style={{
+                        backgroundColor: planInfo.isPlus ? '#fff7ed' : '#f0f9ff',
+                        color: planInfo.isPlus ? '#ea580c' : '#1B365D',
+                      }}
+                    >
+                      {planInfo.isPlus ? '⭐ Plus' : 'Free'}
+                    </span>
                   </div>
 
-                  {videoSub.isPlanActive && videoSub.planExpiry && (
+                  {planInfo.isPlus && planInfo.planExpiry && (
                     <p className="text-xs text-gray-400 mb-2">
-                      {videoSub.maxVideos} video{videoSub.maxVideos !== 1 ? 's' : ''} ·
-                      Expires {new Date(videoSub.planExpiry).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {planInfo.billingCycle === 'yearly' ? 'Yearly' : 'Monthly'} ·
+                      Expires {new Date(planInfo.planExpiry).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </p>
                   )}
 
                   <span
                     className="text-xs font-semibold px-2.5 py-1 rounded-lg"
                     style={{
-                      backgroundColor: videoSub.isPlanActive ? '#dcfce7' : '#fff7ed',
-                      color: videoSub.isPlanActive ? '#16a34a' : '#ea580c',
+                      backgroundColor: planInfo.isPlus ? '#dcfce7' : '#fff7ed',
+                      color: planInfo.isPlus ? '#16a34a' : '#ea580c',
                     }}
                   >
-                    {videoSub.isPlanActive ? '✓ Active' : 'Upgrade Plan →'}
+                    {planInfo.isPlus ? '✓ Active' : 'Upgrade to Plus →'}
                   </span>
                 </div>
 
@@ -380,7 +398,6 @@ function FreelancerDashboardInner({ id }: { id: string }) {
                       <ShoppingCart className="w-3 h-3" /> Buy
                     </button>
                   </div>
-
                 </div>
               </div>
             </div>

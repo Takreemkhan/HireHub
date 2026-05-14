@@ -141,6 +141,7 @@ export async function GET(req: Request) {
           participants: participantStrings,
           jobTitle: jobDetails?.title || null,
           jobStatus: jobDetails?.status || null,
+          isAssigned: !!chat.assignedJob?.jobId,
           participantDetails: [
             {
               _id: otherIdStr,

@@ -179,7 +179,8 @@ export async function GET(req: Request) {
       messages: enhancedMessages,
       participants: (chat.participants || []).map((p: any) => p.toString()),
       total: enhancedMessages.length,
-      isFrozen
+      isFrozen,
+      isAssigned: !!chat.assignedJob?.jobId
     });
   } catch (error) {
     console.error("Error fetching messages:", error);

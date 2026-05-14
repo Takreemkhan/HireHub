@@ -256,6 +256,7 @@ export default function ChatPage({ userId }: ChatPageProps) {
           messages,
           lastMessageAt: messages[messages.length - 1]?.timestamp || new Date(),
           createdAt: messages[0]?.timestamp || new Date(),
+          isAssigned: !!data.isAssigned,
           participantDetails:
             otherSenderId || resolvedDetails
               ? [
@@ -613,7 +614,23 @@ export default function ChatPage({ userId }: ChatPageProps) {
     if (!chat) return "User";
     if (chat?.participantDetails?.length > 0) {
       const detail = chat.participantDetails[0];
-      if (detail?.name && detail.name !== "User") return detail.name;
+      let finalName = "User";
+      if (detail?.name && detail.name !== "User") {
+        finalName = detail.name;
+      }
+      
+      const isClient = detail?.role === "client";
+      const isAssigned = chat.isAssigned;
+
+      if (isClient && !isAssigned) {
+         const parts = finalName.trim().split(/\s+/);
+         if (parts.length > 1) {
+             finalName = `${parts[0].charAt(0).toUpperCase()}. ${parts[1].charAt(0).toUpperCase()}.`;
+         } else if (parts.length === 1 && parts[0]) {
+             finalName = `${parts[0].charAt(0).toUpperCase()}.`;
+         }
+      }
+      return finalName;
     }
     return "User";
   };
