@@ -60,6 +60,7 @@ export default function ChatPage({ userId }: ChatPageProps) {
   const [pinnedJobPaymentStatus, setPinnedJobPaymentStatus] = useState<
     string | null
   >(null);
+  const [pinnedJobClientId, setPinnedJobClientId] = useState<string | null>(null);
   const [isPinnedJobAssigned, setIsPinnedJobAssigned] = useState<
     boolean | null
   >(null);
@@ -136,6 +137,7 @@ export default function ChatPage({ userId }: ChatPageProps) {
             if (data?.job?.title) {
               setPinnedJobTitle(data.job.title);
               setPinnedJobCurrency(data.job.currency || "USD");
+              setPinnedJobClientId(data.job.clientId || null);
               // Check if we already have an assignment for this job in the current chat context
               if (activeChatId) {
                 try {
@@ -175,6 +177,7 @@ export default function ChatPage({ userId }: ChatPageProps) {
         setPinnedJobIdState(null);
         setPinnedJobCurrency(null);
         setPinnedJobPaymentStatus(null);
+        setPinnedJobClientId(null);
         setIsPinnedJobAssigned(false);
         setIsJobLoading(false);
         return;
@@ -198,6 +201,7 @@ export default function ChatPage({ userId }: ChatPageProps) {
             setPinnedJobIdState(d.pinnedJob.jobId || null);
             setPinnedJobCurrency(d.pinnedJob.jobCurrency || "USD");
             setPinnedJobPaymentStatus(d.pinnedJob.paymentStatus || null);
+            setPinnedJobClientId(d.pinnedJob.clientId || null);
             setIsPinnedJobAssigned(!!d.assigned);
             setIsPinnedJobCompleted(d.pinnedJob.jobStatus === "completed");
           } else {
@@ -205,6 +209,7 @@ export default function ChatPage({ userId }: ChatPageProps) {
             setPinnedJobIdState(null);
             setPinnedJobCurrency(null);
             setPinnedJobPaymentStatus(null);
+            setPinnedJobClientId(null);
             setIsPinnedJobAssigned(false);
             setIsPinnedJobCompleted(false);
           }
@@ -551,6 +556,7 @@ export default function ChatPage({ userId }: ChatPageProps) {
     setPinnedJobIdState(null);
     setPinnedJobCurrency(null);
     setPinnedJobPaymentStatus(null);
+    setPinnedJobClientId(null);
     setIsPinnedJobAssigned(false);
     setIsJobLoading(true);
 
@@ -687,6 +693,7 @@ export default function ChatPage({ userId }: ChatPageProps) {
         isJobLoading={isJobLoading}
         pinnedJobCurrency={pinnedJobCurrency}
         pinnedJobPaymentStatus={pinnedJobPaymentStatus}
+        pinnedJobClientId={pinnedJobClientId}
         chatSearch={chatSearch}
         setChatSearch={setChatSearch}
         selectedImage={selectedImage}

@@ -48,6 +48,7 @@ interface ChatWindowProps {
   isJobLoading?: boolean;
   pinnedJobCurrency?: string | null;
   pinnedJobPaymentStatus?: string | null;
+  pinnedJobClientId?: string | null;
   chatSearch: string;
   setChatSearch: (val: string) => void;
   selectedImage: string | null;
@@ -74,6 +75,7 @@ export default function ChatWindow({
   isJobLoading,
   pinnedJobCurrency,
   pinnedJobPaymentStatus,
+  pinnedJobClientId,
   chatSearch,
   setChatSearch,
   selectedImage,
@@ -87,7 +89,7 @@ export default function ChatWindow({
   const [isFrozen, setIsFrozen] = useState(false);
 
   const pathname = usePathname();
-  const isClientRole = !pathname?.includes("/freelancer");
+  const isClientRole = pinnedJobClientId ? userId === pinnedJobClientId : !pathname?.includes("/freelancer");
   const [isTyping, setIsTyping] = useState(false);
   const [otherUserTyping, setOtherUserTyping] = useState(false);
   const [loading, setLoading] = useState(false);

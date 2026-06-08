@@ -13,9 +13,10 @@ interface Transaction {
   status: 'completed' | 'pending' | 'failed' | 'Secured' | 'pending_completion';
   date: string;
   method: string;
+  businessPageId: string | null;
 }
 
-const TransactionHistory = () => {
+const TransactionHistory = ({ viewMode = 'all' }: { viewMode?: 'all' | 'freelancer' | 'business' }) => {
   const [filter, setFilter] = useState<'all' | 'received' | 'withdrawn'>('all');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,18 +25,23 @@ const TransactionHistory = () => {
     try {
       setLoading(true);
       const apiType = type === 'received' ? 'credit' : (type === 'withdrawn' ? 'debit' : 'all');
-      const res = await fetch(`/api/wallet/transactions?type=${apiType}&limit=50`);
+      const res = await fetch(`/api/wallet/transactions?type=${apiType}&limit=50&viewMode=${viewMode}`);
       const data = await res.json();
       if (data.success) {
         setTransactions(data.transactions.map((tx: any) => ({
           id: tx._id,
           type: tx.type === 'credit' ? 'received' : (tx.category === 'platform_fee' ? 'fee' : 'withdrawn'),
-          description: tx.description?.replace(/Escrow securely deposited/gi, 'Deposit') || tx.description,
-          project: tx.projectTitle || (tx.category === 'milestone_release' ? 'Milestone Release' : (tx.category === 'platform_fee' ? 'Service Fee' : 'Payment')),
+          description: (tx.description || '')
+            .replace(/Direct payment for job/gi, 'Card/Bank/UPI Payment')
+            .replace(/Wallet portion for split payment:.*/gi, 'Split Payment (Wallet)')
+            .replace(/Job funded via Wallet:.*/gi, 'Wallet Payment')
+            .replace(/Escrow securely deposited/gi, 'Escrow Deposit'),
+          project: tx.projectTitle || (tx.category === 'milestone_release' ? 'Milestone' : (tx.category === 'platform_fee' ? 'Service Fee' : 'Payment')),
           amount: tx.type === 'credit' ? tx.amount : -tx.amount,
-          status: (tx.category === 'escrow_deposit' && tx.status === 'completed') ? 'Secured' : tx.status,
+          status: ((tx.category === 'escrow_deposit' || tx.category === 'payment') && tx.status === 'completed') ? 'Secured' : tx.status,
           date: new Date(tx.createdAt).toISOString().split('T')[0],
-          method: tx.category === 'topup' ? 'Wallet Top-up' : (tx.category === 'milestone_release' ? 'Escrow Release' : 'System'),
+          method: tx.source === 'razorpay' ? 'Card/Bank/UPI Payment' : (tx.category === 'topup' ? 'Wallet Top-up' : (tx.category === 'milestone_release' ? 'Escrow Release' : 'System')),
+          businessPageId: tx.businessPageId || null,
         })));
       }
     } catch (e) {
@@ -47,9 +53,28 @@ const TransactionHistory = () => {
 
   useEffect(() => {
     fetchTransactions(filter);
-  }, [filter]);
+  }, [filter, viewMode]);
 
   const filteredTransactions = transactions; // Filter is now handled by API
+
+  const borderColors = [
+    'border-l-blue-400',
+    'border-l-emerald-400',
+    'border-l-purple-400',
+    'border-l-amber-400',
+    'border-l-rose-400',
+    'border-l-cyan-400',
+    'border-l-indigo-400'
+  ];
+
+  const getBorderColor = (id: string | null) => {
+    if (!id) return 'border-l-transparent';
+    const hexSegment = id.slice(-6);
+    const num = parseInt(hexSegment, 16);
+    if (isNaN(num)) return borderColors[0];
+    const index = num % borderColors.length;
+    return borderColors[index];
+  };
 
   const getTransactionLabel = (type: string, category: string) => {
     if (category === 'escrow_deposit') return 'Funds Secured';
@@ -199,7 +224,7 @@ const TransactionHistory = () => {
             .map((transaction) => (
               <div
                 key={transaction.id}
-                className="flex items-center justify-between p-4 border border-border rounded-lg hover:border-primary transition-all duration-300"
+                className={`flex items-center justify-between p-4 border border-y-border border-r-border rounded-lg hover:shadow-md transition-all duration-300 border-l-[4px] ${getBorderColor(transaction.businessPageId)}`}
               >
                 <div className="flex items-center space-x-4 flex-1">
                   <div className={`p-3 rounded-lg ${transaction.amount > 0 ? 'bg-brand-green/10' : 'bg-muted'}`}>
@@ -211,13 +236,12 @@ const TransactionHistory = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-2 mb-1">
-                      <h3 className="font-body font-semibold text-foreground truncate">{transaction.description}</h3>
+                      <h3 className="font-body font-semibold text-foreground truncate">{transaction.project}</h3>
                       <span className={`px-2 py-1 text-xs font-body font-medium rounded ${getStatusColor(transaction.status)}`}>
                         {transaction.status}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground font-body truncate">{transaction.project}</p>
-                    <p className="text-xs text-muted-foreground font-body mt-1">{transaction.method}</p>
+                    <p className="text-sm text-muted-foreground font-body truncate">{transaction.description}</p>
                   </div>
                 </div>
                 <div className="text-right ml-4">

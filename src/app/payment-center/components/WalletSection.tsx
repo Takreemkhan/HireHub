@@ -18,6 +18,7 @@ interface Transaction {
     createdAt?: string;
     status: 'completed' | 'pending' | 'failed' | 'pending_completion';
     icon?: string;
+    businessPageId?: string | null;
 }
 
 // Transactions fetched from API — no mock data
@@ -39,7 +40,7 @@ const statusConfig = {
 };
 
 
-export default function WalletSection() {
+export default function WalletSection({ viewMode = 'all' }: { viewMode?: 'all' | 'freelancer' | 'business' }) {
     const { data: session } = useSession();
     const isFreelancer = session?.user?.role === 'freelancer';
     const [razorpayReady, setRazorpayReady] = useState(false);
@@ -60,6 +61,25 @@ export default function WalletSection() {
     const filteredTransactions = transactions.filter(tx =>
         tx.status !== 'pending' && tx.status !== 'pending_completion'
     );
+
+    const borderColors = [
+        'border-l-blue-400',
+        'border-l-emerald-400',
+        'border-l-purple-400',
+        'border-l-amber-400',
+        'border-l-rose-400',
+        'border-l-cyan-400',
+        'border-l-indigo-400'
+    ];
+
+    const getBorderColor = (id: string | null | undefined) => {
+        if (!id) return 'border-l-transparent';
+        const hexSegment = id.slice(-6);
+        const num = parseInt(hexSegment, 16);
+        if (isNaN(num)) return borderColors[0];
+        const index = num % borderColors.length;
+        return borderColors[index];
+    };
 
     // ── Load Razorpay SDK (same as ClientMembershipPage) ─────────────────────
     useEffect(() => {
@@ -87,7 +107,7 @@ export default function WalletSection() {
     const fetchTransactions = async (type: 'all' | 'credit' | 'debit' = 'all') => {
         try {
             setTxLoading(true);
-            const res = await fetch(`/api/wallet/transactions?type=${type}&limit=50&source=wallet`);
+            const res = await fetch(`/api/wallet/transactions?type=${type}&limit=50&source=wallet&viewMode=${viewMode}`);
             const data = await res.json();
             if (data.success) {
                 setTransactions(data.transactions);
@@ -111,8 +131,8 @@ export default function WalletSection() {
         finally { setLoadingStats(false); }
     };
 
-    useEffect(() => { fetchBalance(); fetchTransactions(); fetchStats(); }, []);
-    useEffect(() => { if (activeTab === 'history') fetchTransactions(filter); }, [activeTab, filter]);
+    useEffect(() => { fetchBalance(); fetchTransactions(); fetchStats(); }, [viewMode]);
+    useEffect(() => { if (activeTab === 'history') fetchTransactions(filter); }, [activeTab, filter, viewMode]);
 
     const finalAmount = selectedQuick ?? (customAmount ? parseFloat(customAmount) : null);
     const method = ADD_METHODS.find(m => m.id === selectedMethod)!;
@@ -631,7 +651,7 @@ export default function WalletSection() {
                                 const txDate = tx.createdAt || tx.date || '';
                                 const txKey = tx._id || tx.id || txDate;
                                 return (
-                                    <div key={txKey} className="flex items-center justify-between px-6 py-4 hover:bg-[#FAFBFC] transition-colors">
+                                    <div key={txKey} className={`flex items-center justify-between px-6 py-4 hover:bg-[#FAFBFC] transition-colors border-l-4 ${getBorderColor(tx.businessPageId)}`}>
                                         <div className="flex items-center gap-4">
                                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${tx.type === 'credit' ? 'bg-emerald-50' : 'bg-red-50'}`}>
                                                 <Icon name={txIcon as any} size={18} className={tx.type === 'credit' ? 'text-emerald-600' : 'text-red-500'} />

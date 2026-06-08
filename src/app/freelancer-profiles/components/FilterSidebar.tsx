@@ -320,8 +320,6 @@ interface FilterOption {
 
 interface FilterSidebarProps {
   onFilterChange: (filters: FilterState) => void;
-  categoryCounts?: Record<string, number>;
-  skillCounts?: Record<string, number>;
 }
 
 interface FilterState {
@@ -342,7 +340,7 @@ const DEFAULT_FILTERS: FilterState = {
   verified: false,
 };
 
-const FilterSidebar = ({ onFilterChange, categoryCounts, skillCounts }: FilterSidebarProps) => {
+const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
   const [isHydrated, setIsHydrated] = React.useState(false);
   const [isExpanded, setIsExpanded] = React.useState(true);
   const [filters, setFilters] = React.useState<FilterState>(DEFAULT_FILTERS);
@@ -351,53 +349,13 @@ const FilterSidebar = ({ onFilterChange, categoryCounts, skillCounts }: FilterSi
   const { data: dataCategories } = useFreelancerCategories();
 
   const categories = React.useMemo(() => {
-    if (!dataCategories?.categories) return [];
-    return dataCategories.categories.map((cat: any) => ({
-      ...cat,
-      count: categoryCounts?.[cat.label] || 0
-    }));
-  }, [dataCategories, categoryCounts]);
+    return dataCategories?.categories || [];
+  }, [dataCategories]);
 
   const dynamicTopSkills = React.useMemo(() => {
-    const rawSkills = dataCategories?.topSkills || [
-      { id: 'react', label: 'React' },
-      { id: 'node', label: 'Node' },
-      { id: 'python', label: 'Python' },
-      { id: 'figma', label: 'Figma' },
-      { id: 'seo', label: 'SEO' },
-    ];
+    return dataCategories?.topSkills || [];
+  }, [dataCategories]);
 
-    // Unique-ify and canonicalize
-    const seen = new Set();
-    const baseSkills = rawSkills.map((s: any) => {
-      let label = s.label;
-      let id = s.id;
-      
-      // Canonicalize Node
-      if (label.toLowerCase().includes('node')) {
-        label = 'Node';
-        id = 'node';
-      }
-      
-      return { ...s, id, label };
-    }).filter((s: any) => {
-      const key = s.label.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
-    return baseSkills.map((s: any) => {
-      let countKey = s.label.toLowerCase();
-      // Ensure we use 'node' for any node variations
-      if (countKey.includes('node')) countKey = 'node';
-      
-      return {
-        ...s,
-        count: skillCounts?.[countKey] || 0
-      };
-    });
-  }, [dataCategories, skillCounts]);
 
   const availabilityOptions: FilterOption[] = [
     { id: 'now', label: 'Available Now' },

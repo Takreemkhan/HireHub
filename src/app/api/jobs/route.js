@@ -134,7 +134,8 @@ export async function POST(req) {
       currency,
       attachments,
       isFeatured,
-      payLater
+      payLater,
+      businessPageId,   // optional — set when posting from a business page
     } = body;
 
     // Validation
@@ -174,7 +175,7 @@ export async function POST(req) {
       currency: currency || "INR",
       isFeatured: !!isFeatured,
       payLater: !!payLater
-    });
+    }, businessPageId || null);
 
     // If payment required
     if (result.requiresPayment) {

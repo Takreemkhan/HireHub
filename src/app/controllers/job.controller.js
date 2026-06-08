@@ -129,8 +129,8 @@ export const getAllJobsForFreelancer = async (filters = {}) => {
       }
     },
 
-    // Featured jobs first, then by featuredUntil desc (most recently featured on top), then by chosen sort
-    { $sort: { _featuredActive: -1, featuredUntil: -1, ...sortOptions } },
+    // Featured jobs first, then by chosen sort
+    { $sort: { _featuredActive: -1, ...sortOptions } },
 
     // Total count ke liye facet use karo (pagination + data dono ek saath)
     {

@@ -65,7 +65,7 @@ export async function GET(req) {
                 planStartDate: sub?.planStartDate ?? null,
                 planExpiry: sub?.planExpiry ?? null,
                 // Legacy field kept for backward compat
-                maxVideos: 0,
+                maxVideos: activePlanKey === "plus" ? 3 : 0,
                 planLabel_legacy: activePlan?.label ?? "Basic",
             },
             bidsRemaining,

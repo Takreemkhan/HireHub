@@ -47,7 +47,7 @@ export async function GET(req: Request) {
         if (chat.assignedJob?.jobId) {
             const job = await db.collection(COLLECTIONS.JOBS).findOne(
                 { _id: new ObjectId(chat.assignedJob.jobId) },
-                { projection: { title: 1, _id: 1, status: 1, currency: 1, paymentStatus: 1 } }
+                { projection: { title: 1, _id: 1, status: 1, currency: 1, paymentStatus: 1, clientId: 1 } }
             );
             if (job) {
                 const paymentInfo = await db.collection(COLLECTIONS.PAYMENTS).findOne({ jobId: job._id });
@@ -59,6 +59,7 @@ export async function GET(req: Request) {
                         jobStatus: job.status,
                         jobCurrency: job.currency || "USD",
                         paymentStatus: paymentInfo?.paymentStatus || job.paymentStatus,
+                        clientId: job.clientId?.toString() || null,
                         assigned: true
                     }
                 });
@@ -88,7 +89,7 @@ export async function GET(req: Request) {
             if (activeProposal) {
                 const job = await db.collection(COLLECTIONS.JOBS).findOne(
                     { _id: activeProposal.jobId },
-                    { projection: { title: 1, _id: 1, currency: 1, paymentStatus: 1 } }
+                    { projection: { title: 1, _id: 1, currency: 1, paymentStatus: 1, clientId: 1 } }
                 );
                 if (job) {
                     const paymentInfo = await db.collection(COLLECTIONS.PAYMENTS).findOne({ jobId: job._id });
@@ -99,6 +100,7 @@ export async function GET(req: Request) {
                             jobTitle: job.title,
                             jobCurrency: job.currency || "USD",
                             paymentStatus: paymentInfo?.paymentStatus || job.paymentStatus,
+                            clientId: job.clientId?.toString() || null,
                             assigned: false
                         }
                     });

@@ -878,6 +878,7 @@ function PostJobContent() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const draftId = searchParams.get("draftId");
+  const businessId = searchParams.get("businessId");
   const [loading, setLoading] = useState(false);
   const [isDraftLoading, setIsDraftLoading] = useState(false);
   const [walletLoading, setWalletLoading] = useState(false);
@@ -994,7 +995,8 @@ function PostJobContent() {
         currency: formData.currency || "INR",
         questions: formData.questions,
         isFeatured,
-        payLater
+        payLater,
+        businessPageId: businessId || undefined
       };
 
       const response = await fetch("/api/jobs/payment/wallet-pay", {
@@ -1012,7 +1014,11 @@ function PostJobContent() {
       if (res.jobId) localStorage.setItem("newJobId", res.jobId);
       await queryClient.invalidateQueries({ queryKey: ["current-jobs-clients"] });
       setIsPosting(true);
-      router.replace("/client-dashboard?success=job_posted");
+      if (businessId) {
+        router.replace(`/business-dashboard/${businessId}?view=current`);
+      } else {
+        router.replace("/client-dashboard?success=job_posted");
+      }
     } catch (err: any) {
       setError(err.message || "Something went wrong with wallet payment");
     } finally {
@@ -1078,15 +1084,16 @@ function PostJobContent() {
     setShowSplitNext(false);
     if (!splitResponse) return;
 
-    const { razorpayKeyId, amountInPaise, orderId, jobId, clientName, clientEmail } = splitResponse;
+    const { razorpayKeyId, amountInPaise, orderId, jobId, clientName, clientEmail, currency } = splitResponse;
+    const orderCurrencySymbol = currency === 'USD' ? '$' : currency === 'GBP' ? '£' : currency === 'EUR' ? '€' : '₹';
 
     const options = {
       key: razorpayKeyId,
       amount: amountInPaise,
-      currency: "INR",
+      currency: currency || "INR",
       order_id: orderId,
       name: "HireHub - Finalize Payment",
-      description: `Card payment: ₹${splitData?.rzpPart.toFixed(2)}`,
+      description: `Card payment: ${orderCurrencySymbol}${splitData?.rzpPart.toFixed(2)}`,
       handler: async function (response: any) {
         setLoading(true);
         const verifyRes = await fetch("/api/jobs/payment/verify-split", {
@@ -1105,7 +1112,11 @@ function PostJobContent() {
         if (verifyData.success) {
           await queryClient.invalidateQueries({ queryKey: ["current-jobs-clients"] });
           setIsPosting(true);
-          router.replace("/client-dashboard?success=job_posted");
+          if (businessId) {
+            router.replace(`/business-dashboard/${businessId}?view=current`);
+          } else {
+            router.replace("/client-dashboard?success=job_posted");
+          }
         } else {
           setError("Payment verification failed. Please contact support.");
         }
@@ -1304,7 +1315,11 @@ function PostJobContent() {
           if (verifyData.success) {
             await queryClient.invalidateQueries({ queryKey: ["current-jobs-clients"] });
             setIsPosting(true);
-            router.replace("/client-dashboard?success=job_posted");
+            if (businessId) {
+              router.replace(`/business-dashboard/${businessId}?view=current`);
+            } else {
+              router.replace("/client-dashboard?success=job_posted");
+            }
           } else {
             setError("Payment verification failed. Contact support with payment ID: " + response.razorpay_payment_id);
           }
@@ -1379,6 +1394,7 @@ function PostJobContent() {
         currency: formData.currency || "USD",
         isFeatured,
         payLater,
+        businessPageId: businessId || undefined
       };
       const res = await fetch("/api/jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
@@ -1393,7 +1409,11 @@ function PostJobContent() {
       else {
         await queryClient.invalidateQueries({ queryKey: ["current-jobs-clients"] });
         setIsPosting(true);
-        router.replace("/client-dashboard?success=job_posted");
+        if (businessId) {
+          router.replace(`/business-dashboard/${businessId}?view=current`);
+        } else {
+          router.replace("/client-dashboard?success=job_posted");
+        }
       }
     } catch (err: any) {
       setError(err.message || "Something went wrong");
@@ -1437,14 +1457,14 @@ function PostJobContent() {
         </div>
       )}
 
-      <div className="min-h-screen bg-gray-100 flex justify-center py-10 px-4 mt-10">
-        <div className="w-full max-w-7xl bg-white rounded-lg shadow-sm px-6 sm:px-10 md:px-14 lg:px-16 py-10">
+      <div className="min-h-screen bg-[#FAFBFC] flex justify-center py-10 px-4 mt-10">
+        <div className="w-full max-w-7xl bg-white rounded-2xl shadow-xl shadow-[#1B365D]/5 border border-gray-100 px-6 sm:px-10 md:px-14 lg:px-16 py-12">
 
           {/* HEADER */}
-          <h1 className="font-semibold text-gray-900 text-3xl sm:text-4xl md:text-5xl lg:text-6xl">
+          <h1 className="font-bold text-[#1B365D] text-3xl sm:text-4xl md:text-5xl lg:text-6xl tracking-tight">
             {draftId ? "Edit Job Draft" : "Post a job"}
           </h1>
-          <p className="mt-3 text-gray-600 text-base sm:text-lg md:text-xl">
+          <p className="mt-4 text-[#FF6B35] font-medium text-base sm:text-lg md:text-xl">
             Tell us what you need. We&apos;ll connect you with top talent.
           </p>
 
@@ -1466,7 +1486,10 @@ function PostJobContent() {
             </div>
           )}
 
-          <hr className="my-8" />
+          <div className="my-10 flex items-center">
+            <div className="h-1.5 w-24 bg-[#FF6B35] rounded-full"></div>
+            <div className="h-px bg-gray-200 flex-1 ml-4"></div>
+          </div>
 
           {isDraftLoading ? (
             <div className="space-y-12 animate-in fade-in duration-500">
@@ -1524,14 +1547,14 @@ function PostJobContent() {
             <>
               {/* CATEGORY */}
               <section className="mb-12">
-            <p className="text-base md:text-lg text-gray-700 mb-6">
+            <p className="text-base md:text-lg text-[#1B365D] font-medium mb-6">
               Choose a category that best fits your job.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
               {/* Category dropdown */}
               <div>
-                <label className="block font-semibold uppercase text-gray-600 mb-2 text-sm">
+                <label className="block font-bold uppercase text-[#1B365D] tracking-wide mb-2 text-sm">
                   Category *
                 </label>
                 <select
@@ -1549,7 +1572,7 @@ function PostJobContent() {
 
               {/* Subcategory — text input for "Other", dropdown otherwise */}
               <div>
-                <label className="block font-semibold uppercase text-gray-600 mb-2 text-sm">
+                <label className="block font-bold uppercase text-[#1B365D] tracking-wide mb-2 text-sm">
                   Subcategory *
                 </label>
 
@@ -1613,7 +1636,7 @@ function PostJobContent() {
 
           {/* JOB TITLE */}
           <section className="mb-12">
-            <label className="block font-semibold uppercase text-gray-600 mb-2 text-sm">
+            <label className="block font-bold uppercase text-[#1B365D] tracking-wide mb-2 text-sm">
               Job title *
             </label>
             <input
@@ -1627,7 +1650,7 @@ function PostJobContent() {
 
           {/* JOB DESCRIPTION */}
           <section className="mb-12">
-            <label className="block font-semibold uppercase text-gray-600 mb-2 text-sm">
+            <label className="block font-bold uppercase text-[#1B365D] tracking-wide mb-2 text-sm">
               Job description *
             </label>
             <textarea
@@ -1641,8 +1664,8 @@ function PostJobContent() {
 
           {/* UPLOAD SAMPLES */}
           <section className="mb-12">
-            <label className="block font-semibold uppercase text-gray-600 mb-3 text-sm">
-              Upload samples or helpful material <span className="text-gray-400 font-normal normal-case text-xs">(optional — JPEG, PNG, PDF · max 5MB each)</span>
+            <label className="block font-bold uppercase text-[#1B365D] tracking-wide mb-3 text-sm">
+              Upload samples or helpful material <span className="text-[#FF6B35] font-normal normal-case text-xs">(optional — JPEG, PNG, PDF · max 5MB each)</span>
             </label>
 
             {/* Drop zone */}
@@ -1732,8 +1755,8 @@ function PostJobContent() {
 
           {/* BUDGET */}
           <section className="mb-14">
-            <label className="block font-semibold uppercase text-gray-600 mb-4 text-sm">
-              Budget * <span className="text-gray-400 text-xs font-normal">(minimum {currencySymbol}500)</span>
+            <label className="block font-bold uppercase text-[#1B365D] tracking-wide mb-4 text-sm">
+              Budget * <span className="text-[#FF6B35] font-normal normal-case text-xs">(minimum {currencySymbol}500)</span>
             </label>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <select
@@ -1767,7 +1790,7 @@ function PostJobContent() {
 
           {/* VISIBILITY */}
           <section className="mb-14">
-            <label className="block font-semibold uppercase text-gray-600 mb-3 text-sm">
+            <label className="block font-bold uppercase text-[#1B365D] tracking-wide mb-3 text-sm">
               Job visibility
             </label>
             <div className="space-y-3 text-lg text-gray-700">
@@ -1796,7 +1819,7 @@ function PostJobContent() {
           <section className="mb-14">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-orange-500 text-base">⚡</span>
-              <label className="block font-semibold uppercase text-gray-600 text-sm">
+              <label className="block font-bold uppercase text-[#1B365D] tracking-wide text-sm">
                 Boost Your Job
               </label>
             </div>
@@ -1853,9 +1876,9 @@ function PostJobContent() {
 
           {/* GET TO KNOW YOUR FREELANCERS */}
           <section className="mb-12">
-            <label className="block font-semibold uppercase text-gray-600 mb-2 text-sm">
+            <label className="block font-bold uppercase text-[#1B365D] tracking-wide mb-2 text-sm">
               Get to know your freelancers{" "}
-              <span className="text-gray-400 font-normal">(optional)</span>
+              <span className="text-[#FF6B35] font-normal normal-case">(optional)</span>
             </label>
             {formData.questions.map((question, index) => (
               <div key={index} className="flex gap-2 mb-3">
@@ -1897,7 +1920,7 @@ function PostJobContent() {
 
           {/* ESTIMATED PROJECT DURATION */}
           <section className="mb-14">
-            <label className="block font-semibold uppercase text-gray-600 mb-2 text-sm">
+            <label className="block font-bold uppercase text-[#1B365D] tracking-wide mb-2 text-sm">
               Estimated project duration *
             </label>
             <select
@@ -2019,7 +2042,7 @@ function PostJobContent() {
                       </div>
                       <div>
                         <p className="text-xs text-gray-500 font-medium">Your Wallet Balance</p>
-                        <p className="font-bold text-blue-900">₹{walletBalance.toLocaleString("en-IN")}</p>
+                        <p className="font-bold text-blue-900">{currencySymbol}{walletBalance.toLocaleString("en-IN")}</p>
                       </div>
                     </div>
                     {walletBalance >= getTotalPayableNow() ? (
@@ -2093,7 +2116,7 @@ function PostJobContent() {
               </div>
               <h3 className="text-xl font-bold text-center text-gray-900 mb-2">Confirm Wallet Payment</h3>
               <p className="text-center text-gray-600 mb-8">
-                You are about to pay <span className="font-bold text-gray-900">₹{getTotalPayableNow().toLocaleString("en-IN")}</span> directly from your HireHub Wallet.
+                You are about to pay <span className="font-bold text-gray-900">{currencySymbol}{getTotalPayableNow().toLocaleString("en-IN")}</span> directly from your HireHub Wallet.
               </p>
               <div className="flex gap-3">
                 <button
@@ -2128,15 +2151,15 @@ function PostJobContent() {
               <div className="bg-gray-50 rounded-xl p-4 mb-8 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">From Wallet</span>
-                  <span className="font-bold text-gray-900">₹{splitData.walletPart.toLocaleString("en-IN")}</span>
+                  <span className="font-bold text-gray-900">{currencySymbol}{splitData.walletPart.toLocaleString("en-IN")}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">From Card/UPI</span>
-                  <span className="font-bold text-blue-600">₹{splitData.rzpPart.toLocaleString("en-IN")}</span>
+                  <span className="font-bold text-blue-600">{currencySymbol}{splitData.rzpPart.toLocaleString("en-IN")}</span>
                 </div>
                 <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-gray-900">
                   <span>Total</span>
-                  <span>₹{getTotalPayableNow().toLocaleString("en-IN")}</span>
+                  <span>{currencySymbol}{getTotalPayableNow().toLocaleString("en-IN")}</span>
                 </div>
               </div>
               <div className="flex gap-3">
@@ -2172,14 +2195,14 @@ function PostJobContent() {
               <div className="space-y-4 mb-8">
                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl border border-gray-100">
                   <span className="text-gray-600 font-medium">Wallet Contribution:</span>
-                  <span className="text-emerald-600 font-bold">₹{splitData?.walletPart.toLocaleString()}</span>
+                  <span className="text-emerald-600 font-bold">{currencySymbol}{splitData?.walletPart.toLocaleString()}</span>
                 </div>
                 <p className="text-gray-600 text-center px-2">
                   Your wallet balance has been verified. To complete job posting, please pay the remaining amount via your preferred card or UPI.
                 </p>
                 <div className="flex justify-between items-center p-3 bg-blue-50/50 rounded-xl border border-blue-100">
                   <span className="text-gray-700 font-semibold">Remaining Amount:</span>
-                  <span className="text-blue-700 font-bold text-lg">₹{splitData?.rzpPart.toLocaleString()}</span>
+                  <span className="text-blue-700 font-bold text-lg">{currencySymbol}{splitData?.rzpPart.toLocaleString()}</span>
                 </div>
               </div>
               <button

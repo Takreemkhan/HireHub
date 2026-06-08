@@ -552,7 +552,7 @@
 
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { Clock, MapPin, Tag, Briefcase, Plus, Banknote } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -736,6 +736,8 @@ function JobCardSkeleton() {
 
 export default function CurrentJobsSection() {
   const router = useRouter();
+  const params = useParams();
+  const businessId = params?.businessId as string | undefined;
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -755,7 +757,8 @@ export default function CurrentJobsSection() {
         console.log('📥 Fetching current jobs from GET /api/client/jobs/current...');
 
         // ✅ NEW ENDPOINT - Returns only current user's jobs (open + in-progress)
-        const res = await fetch('/api/client/jobs/current');
+        const fetchUrl = businessId ? `/api/client/jobs/current?businessId=${businessId}` : '/api/client/jobs/current';
+        const res = await fetch(fetchUrl);
         const data = await res.json();
 
         console.log('📦 Response:', data);
@@ -838,7 +841,7 @@ export default function CurrentJobsSection() {
               You don't have any active or in-progress jobs at the moment.
             </p>
             <button
-              onClick={() => router.push('/post-page')}
+              onClick={() => router.push(businessId ? `/post-page?businessId=${businessId}` : '/post-page')}
               className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
             >
               <Plus className="w-4 h-4" />
@@ -866,7 +869,7 @@ export default function CurrentJobsSection() {
             </p>
           </div>
           <button
-            onClick={() => router.push('/post-page')}
+            onClick={() => router.push(businessId ? `/post-page?businessId=${businessId}` : '/post-page')}
             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
           >
             <Plus className="w-4 h-4" />
@@ -884,7 +887,6 @@ export default function CurrentJobsSection() {
             />
           ))}
         </div>
-
       </div>
     </div>
   );

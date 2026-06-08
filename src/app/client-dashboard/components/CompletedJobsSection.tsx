@@ -96,7 +96,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import CompletedJobCard from './CompletedJobCard';
 import { Briefcase } from 'lucide-react';
 
@@ -154,6 +154,8 @@ function CompletedJobCardSkeleton() {
 
 export default function CompletedJobsSection() {
   const router = useRouter();
+  const params = useParams();
+  const businessId = params?.businessId as string | undefined;
 
   const [jobs, setJobs] = useState<CompletedJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -169,7 +171,8 @@ export default function CompletedJobsSection() {
         console.log('📥 Fetching completed jobs from GET /api/client/jobs/completed...');
 
         // ✅ NEW ENDPOINT - Returns only completed jobs for current user
-        const res = await fetch('/api/client/jobs/completed');
+        const fetchUrl = businessId ? `/api/client/jobs/completed?businessId=${businessId}` : '/api/client/jobs/completed';
+        const res = await fetch(fetchUrl);
         const data = await res.json();
 
         console.log('📦 Response:', data);

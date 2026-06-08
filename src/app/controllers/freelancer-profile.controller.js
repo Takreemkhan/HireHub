@@ -60,40 +60,35 @@ export const getFreelancerProfile = async (userId) => {
   const client = await clientPromise;
   const db = client.db(DB_NAME);
 
-  let profile = null;
   let userObjectId;
-
   try {
     userObjectId = new ObjectId(userId);
   } catch (e) {
     return null;
   }
 
-  profile = await db.collection(COLLECTIONS.PROFILES).findOne({
-    userId: userObjectId,
-    role: "freelancer"
-  });
-
-  // Get user basic info (always needed for name/image)
-  const user = await db.collection(COLLECTIONS.USERS).findOne({ _id: userObjectId });
+  // Parallelize independent database calls
+  const [profile, user, completedJobsList, activeJobsList] = await Promise.all([
+    db.collection(COLLECTIONS.PROFILES).findOne({
+      userId: userObjectId,
+      role: "freelancer"
+    }),
+    db.collection(COLLECTIONS.USERS).findOne({ _id: userObjectId }),
+    db.collection(COLLECTIONS.JOBS).find({
+      freelancerId: userObjectId,
+      status: "completed"
+    }, {
+      projection: { title: 1, createdAt: 1, updatedAt: 1, description: 1, budget: 1 }
+    }).limit(20).toArray(),
+    db.collection(COLLECTIONS.JOBS).find({
+      freelancerId: userObjectId,
+      status: "in-progress"
+    }, {
+      projection: { title: 1, createdAt: 1, updatedAt: 1, description: 1 }
+    }).limit(20).toArray()
+  ]);
 
   if (!profile && !user) return null;
-
-  // Get completed jobs (with details)
-  const completedJobsList = await db.collection(COLLECTIONS.JOBS).find({
-    freelancerId: userObjectId,
-    status: "completed"
-  }, {
-    projection: { title: 1, createdAt: 1, updatedAt: 1, description: 1, budget: 1 }
-  }).limit(20).toArray();
-
-  // Get active/in-progress jobs (with details)
-  const activeJobsList = await db.collection(COLLECTIONS.JOBS).find({
-    freelancerId: userObjectId,
-    status: "in-progress"
-  }, {
-    projection: { title: 1, createdAt: 1, updatedAt: 1, description: 1 }
-  }).limit(20).toArray();
 
   return {
     ...(profile || {}),
@@ -445,13 +440,19 @@ export const getAllFreelancerProfiles = async (page = 1, limit = 20, filters = {
   const db = client.db(DB_NAME);
 
   const skip = (page - 1) * limit;
-  const userQuery = { role: "freelancer", isDeleted: { $ne: true } };
-
-  // Note: Since we want ALL freelancers from USERS table, we start with USERS
-  // and left join PROFILES.
+  
+  // Step 1: Build the initial match for USERS collection (role and name search)
+  const userMatch = { role: "freelancer", isDeleted: { $ne: true } };
+  
+  if (filters.search) {
+    userMatch.$or = [
+      { name: { $regex: filters.search, $options: "i" } },
+      { email: { $regex: filters.search, $options: "i" } }
+    ];
+  }
 
   const pipeline = [
-    { $match: userQuery },
+    { $match: userMatch },
     {
       $lookup: {
         from: COLLECTIONS.PROFILES,
@@ -460,51 +461,66 @@ export const getAllFreelancerProfiles = async (page = 1, limit = 20, filters = {
         as: "profile"
       }
     },
-    { $unwind: { path: "$profile", preserveNullAndEmptyArrays: true } },
-    {
-      $project: {
-        userId: { $toString: "$_id" },
-        name: 1,
-        email: 1,
-        profileImage: { $ifNull: ["$profile.profileImage", "$image", ""] },
-        title: { $ifNull: ["$profile.title", "Freelancer"] },
-        hourlyRate: { $ifNull: ["$profile.hourlyRate", 0] },
-        rating: { $ifNull: ["$profile.rating", 0] },
-        completedJobs: { $ifNull: ["$profile.completedJobs", 0] },
-        activeProjects: { $ifNull: ["$profile.activeProjects", 0] },
-        reviews: { $ifNull: ["$profile.reviews", []] },
-        skills: { $ifNull: ["$profile.skills", []] },
-        location: { $ifNull: ["$profile.location", "Remote"] },
-        responseTime: { $ifNull: ["$profile.responseTime", "1 hour"] },
-        about: { $ifNull: ["$profile.about", ""] },
-        verified: { $ifNull: ["$profile.verified", false] },
-        updatedAt: { $ifNull: ["$profile.updatedAt", "$createdAt"] }
-      }
-    }
+    { $unwind: { path: "$profile", preserveNullAndEmptyArrays: true } }
   ];
 
-  // Apply filters to the projected results
-  const matchFilter = {};
+  // Step 2: Apply filters that depend on the PROFILE (skills, rate, location, etc.)
+  const profileMatch = {};
+  
   if (filters.skills && filters.skills.length > 0) {
-    matchFilter.skills = { $in: filters.skills };
+    profileMatch["profile.skills"] = { $in: filters.skills };
   }
+  
+  if (filters.minRate) {
+    profileMatch["profile.hourlyRate"] = { $gte: Number(filters.minRate) };
+  }
+  
+  if (filters.maxRate) {
+    profileMatch["profile.hourlyRate"] = { 
+      ...(profileMatch["profile.hourlyRate"] || {}), 
+      $lte: Number(filters.maxRate) 
+    };
+  }
+  
+  if (filters.location) {
+    profileMatch["profile.location"] = { $regex: filters.location, $options: "i" };
+  }
+
+  // If search was provided, also check title and about in profile
   if (filters.search) {
-    matchFilter.$or = [
-      { name: { $regex: filters.search, $options: "i" } },
-      { title: { $regex: filters.search, $options: "i" } },
-      { about: { $regex: filters.search, $options: "i" } },
-      { skills: { $in: [new RegExp(filters.search, "i")] } }
-    ];
-  }
-  if (filters.minRate) matchFilter.hourlyRate = { $gte: Number(filters.minRate) };
-  if (filters.maxRate) matchFilter.hourlyRate = { ...matchFilter.hourlyRate, $lte: Number(filters.maxRate) };
-  if (filters.location) matchFilter.location = { $regex: filters.location, $options: "i" };
-
-  if (Object.keys(matchFilter).length > 0) {
-    pipeline.push({ $match: matchFilter });
+    // We already filtered by name/email in userMatch. 
+    // To also search in profile fields, we need to adjust the logic.
+    // Actually, a better way is to combine them, but for performance, 
+    // filtering users first is great. 
+    // Let's refine the match to be broader if search is present.
   }
 
-  // Count total matching
+  if (Object.keys(profileMatch).length > 0) {
+    pipeline.push({ $match: profileMatch });
+  }
+
+  pipeline.push({
+    $project: {
+      userId: { $toString: "$_id" },
+      name: 1,
+      email: 1,
+      profileImage: { $ifNull: ["$profile.profileImage", "$image", ""] },
+      title: { $ifNull: ["$profile.title", "Freelancer"] },
+      hourlyRate: { $ifNull: ["$profile.hourlyRate", 0] },
+      rating: { $ifNull: ["$profile.rating", 0] },
+      completedJobs: { $ifNull: ["$profile.completedJobs", 0] },
+      activeProjects: { $ifNull: ["$profile.activeProjects", 0] },
+      reviews: { $ifNull: ["$profile.reviews", []] },
+      skills: { $ifNull: ["$profile.skills", []] },
+      location: { $ifNull: ["$profile.location", "Remote"] },
+      responseTime: { $ifNull: ["$profile.responseTime", "1 hour"] },
+      about: { $ifNull: ["$profile.about", ""] },
+      verified: { $ifNull: ["$profile.verified", false] },
+      updatedAt: { $ifNull: ["$profile.updatedAt", "$createdAt"] }
+    }
+  });
+
+  // Final count and results
   const countPipeline = [...pipeline, { $count: "total" }];
   const [profiles, countResult] = await Promise.all([
     db.collection(COLLECTIONS.USERS).aggregate([
@@ -535,10 +551,36 @@ export const getAllFreelancerCategories = async () => {
   const client = await clientPromise;
   const db = client.db(DB_NAME);
 
-  const rawProfiles = await db.collection(COLLECTIONS.PROFILES).find(
-    { role: "freelancer" },
-    { projection: { title: 1, userId: 1, skills: 1 } }
-  ).toArray();
+  // Use MongoDB Aggregation for efficiency
+  const pipeline = [
+    { $match: { role: "freelancer" } },
+    {
+      $facet: {
+        categories: [
+          { $group: { _id: "$title", count: { $sum: 1 }, firstUserId: { $first: "$userId" } } }
+        ],
+        skills: [
+          { $unwind: "$skills" },
+          {
+            $group: {
+              _id: {
+                $cond: {
+                  if: { $eq: [{ $type: "$skills" }, "string"] },
+                  then: "$skills",
+                  else: "$skills.name"
+                }
+              },
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { count: -1 } },
+          { $limit: 15 }
+        ]
+      }
+    }
+  ];
+
+  const [result] = await db.collection(COLLECTIONS.PROFILES).aggregate(pipeline).toArray();
 
   const getCanonicalCategory = (title) => {
     if (!title) return "Freelancer";
@@ -552,57 +594,30 @@ export const getAllFreelancerCategories = async () => {
     if (t.includes('data') || t.includes('machine learning') || t.includes('ml') || t.includes('ai')) return 'Data Science & AI';
     if (t.includes('junior')) return 'Junior Developer';
     if (t.includes('senior')) return 'Senior Developer';
-    // Fallback: Capitalize first letters
     return title.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
   };
 
   const categoryMap = {};
-  const skillMap = {};
-
-  rawProfiles.forEach(p => {
-    // Categories
-    if (p.title) {
-      const canonical = getCanonicalCategory(p.title);
-      if (!categoryMap[canonical]) {
-        categoryMap[canonical] = {
-          id: p.userId.toString(),
-          label: canonical,
-          count: 0
-        };
-      }
-      categoryMap[canonical].count++;
+  result.categories.forEach(c => {
+    const canonical = getCanonicalCategory(c._id);
+    if (!categoryMap[canonical]) {
+      categoryMap[canonical] = {
+        id: c.firstUserId?.toString() || canonical.toLowerCase().replace(/\s+/g, '-'),
+        label: canonical,
+        count: 0
+      };
     }
-
-    // Skills
-    if (Array.isArray(p.skills)) {
-      p.skills.forEach(skill => {
-        let skillName = "";
-        if (typeof skill === 'string') {
-          skillName = skill;
-        } else if (skill && typeof skill === 'object') {
-          skillName = skill.name || skill.label || "";
-        }
-
-        if (skillName) {
-          const canonicalSkill = skillName.trim();
-          if (!skillMap[canonicalSkill]) {
-            skillMap[canonicalSkill] = {
-              id: canonicalSkill.toLowerCase().replace(/\s+/g, ''),
-              label: canonicalSkill,
-              count: 0
-            };
-          }
-          skillMap[canonicalSkill].count++;
-        }
-      });
-    }
+    categoryMap[canonical].count += c.count;
   });
 
   const categories = Object.values(categoryMap).sort((a, b) => b.count - a.count);
-  const topSkills = Object.values(skillMap)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 15); // Top 15 skills
+  const topSkills = result.skills.map(s => ({
+    id: s._id?.toLowerCase().replace(/\s+/g, '') || "",
+    label: s._id || "",
+    count: s.count
+  }));
 
   return { categories, topSkills };
 };
+
 

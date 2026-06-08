@@ -59,6 +59,7 @@ export const COLLECTIONS = {
   PAYMENTS: "payments",
   DISPUTES: "disputes",
   RESUME_VIDEOS: "resume_videos",
+  BUSINESS_PAGES: "business_pages",
 };
 
 export default clientPromise;

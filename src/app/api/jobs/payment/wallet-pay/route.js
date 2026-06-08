@@ -81,6 +81,7 @@ export async function POST(req) {
             proposalCount: 0,
             createdAt: now,
             updatedAt: now,
+            businessPageId: body.businessPageId ? new ObjectId(body.businessPageId) : null
         };
 
         const jobResult = await db.collection(COLLECTIONS.JOBS).insertOne(job);

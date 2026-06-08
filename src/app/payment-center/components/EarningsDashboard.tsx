@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import Icon from '@/components/ui/AppIcon';
 import Skeleton from '@/components/ui/Skeleton';
+import { useQuery } from '@tanstack/react-query';
 
 interface EarningData {
   month: string;
@@ -18,28 +19,18 @@ interface CategoryData {
 }
 
 const EarningsDashboard = () => {
-  const [statsData, setStatsData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState<'6months' | '1year' | 'all'>('6months');
-
-  const fetchStats = async () => {
-    try {
-      setLoading(true);
+  const { data: statsData, isLoading: loading } = useQuery({
+    queryKey: ['earnings-stats'],
+    queryFn: async () => {
       const res = await fetch('/api/payment-center/stats');
       const data = await res.json();
-      if (data.success) {
-        setStatsData(data.stats);
-      }
-    } catch (e) {
-      console.error('Fetch stats error:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (!data.success) throw new Error('Failed to fetch stats');
+      return data.stats;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
+  const [timeRange, setTimeRange] = useState<'6months' | '1year' | 'all'>('6months');
 
   const stats = [
     { label: 'Total Earnings', value: `₹${(statsData?.totalAdded || 0).toLocaleString('en-IN')}`, change: '+12.5%', icon: 'CurrencyDollarIcon', color: 'text-brand-green' },

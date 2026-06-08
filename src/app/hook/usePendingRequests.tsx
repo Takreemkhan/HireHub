@@ -1,4 +1,4 @@
-// hooks/usePendingRequests.ts
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useCallback } from 'react';
 import { getSocket } from '@/socket/socket';
 
@@ -14,183 +14,103 @@ interface PendingRequest {
 interface UsePendingRequestsReturn {
   pendingRequests: PendingRequest[];
   loading: boolean;
-  error: string | null;
-  fetchPendingRequests: () => Promise<void>;
+  error: any;
+  fetchPendingRequests: () => void;
   acceptRequest: (requestId: string, fromUserId: string) => Promise<string | null>;
   rejectRequest: (requestId: string) => Promise<boolean>;
   clearError: () => void;
   totalCount: number;
-   showNewConversation: boolean;
+  showNewConversation: boolean;
   setShowNewConversation: React.Dispatch<React.SetStateAction<boolean>>;
-    handleNewConversation: () => void;
+  handleNewConversation: () => void;
 }
 
 export const usePendingRequests = (userId: string | undefined): UsePendingRequestsReturn => {
-  const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-    const [showNewConversation, setShowNewConversation] = useState(false);
-const handleNewConversation = () => setShowNewConversation(true);
+  const queryClient = useQueryClient();
+  const [showNewConversation, setShowNewConversation] = useState(false);
+  const handleNewConversation = () => setShowNewConversation(true);
 
-  const fetchPendingRequests = useCallback(async () => {
-    if (!userId) {
-      setPendingRequests([]);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
+  const { data: pendingRequests = [], isLoading: loading, error, refetch } = useQuery<PendingRequest[]>({
+    queryKey: ['pending-requests', userId],
+    queryFn: async () => {
       const res = await fetch(`/api/chat-request?userId=${userId}`);
-      
-      if (!res.ok) {
-        throw new Error(`Failed to fetch requests: ${res.status}`);
-      }
-
+      if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      
-      // Backend returns requests where current user is the receiver
-      const received = data.requests || [];
-      setPendingRequests(received);
-    } catch (error) {
-      console.error("Error fetching pending requests:", error);
-      setError(error instanceof Error ? error.message : "Failed to fetch pending requests");
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
+      return data.requests || [];
+    },
+    enabled: !!userId,
+    staleTime: 60_000, // 1 minute
+  });
 
-  const acceptRequest = useCallback(async (requestId: string, fromUserId: string): Promise<string | null> => {
-    if (!userId) {
-      setError("User not authenticated");
-      return null;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
+  const acceptMutation = useMutation({
+    mutationFn: async (requestId: string) => {
       const res = await fetch("/api/chat-request/accept", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId }),
       });
-
-      if (!res.ok) {
-        throw new Error(`Failed to accept request: ${res.status}`);
-      }
-
-      const data = await res.json();
-
-      if (data.chatId) {
-        // Remove the accepted request from the list
-        setPendingRequests(prev => prev.filter(req => req._id !== requestId));
-
-        // Send real-time notification
-        try {
-          const socket = getSocket();
-          if (socket.connected) {
-            socket.emit("chat:accept", {
-              requestId,
-              chatId: data.chatId,
-              fromUserId: data.fromUserId,
-              toUserId: userId,
-            });
-          }
-        } catch (socketError) {
-          console.warn("Could not send real-time notification:", socketError);
+      if (!res.ok) throw new Error('Failed to accept');
+      return res.json();
+    },
+    onSuccess: (data, requestId) => {
+      queryClient.invalidateQueries({ queryKey: ['pending-requests', userId] });
+      // Emit socket event if needed
+      try {
+        const socket = getSocket();
+        if (socket.connected) {
+          socket.emit("chat:accept", {
+            requestId,
+            chatId: data.chatId,
+            fromUserId: data.fromUserId,
+            toUserId: userId,
+          });
         }
-
-        return data.chatId;
-      } else {
-        throw new Error(data.error || "Failed to accept request");
-      }
-    } catch (error) {
-      console.error("Error accepting request:", error);
-      setError(error instanceof Error ? error.message : "Failed to accept request");
-      return null;
-    } finally {
-      setLoading(false);
+      } catch (e) {}
     }
-  }, [userId]);
+  });
 
-  const rejectRequest = useCallback(async (requestId: string): Promise<boolean> => {
-    if (!userId) {
-      setError("User not authenticated");
-      return false;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
+  const rejectMutation = useMutation({
+    mutationFn: async (requestId: string) => {
       const res = await fetch("/api/chat-request/reject", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId }),
       });
-
-      if (!res.ok) {
-        throw new Error(`Failed to reject request: ${res.status}`);
-      }
-
-      const data = await res.json();
-
-      if (data.success) {
-        // Remove the rejected request from the list
-        setPendingRequests(prev => prev.filter(req => req._id !== requestId));
-        return true;
-      } else {
-        throw new Error(data.error || "Failed to reject request");
-      }
-    } catch (error) {
-      console.error("Error rejecting request:", error);
-      setError(error instanceof Error ? error.message : "Failed to reject request");
-      return false;
-    } finally {
-      setLoading(false);
+      if (!res.ok) throw new Error('Failed to reject');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-requests', userId] });
     }
-  }, [userId]);
+  });
 
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
-
-  // Set up socket listener for new requests
   useEffect(() => {
     if (!userId) return;
-
     const socket = getSocket();
-
-    const handleNewRequest = (data: any) => {
-      // When a new request is received, refresh the list
-      fetchPendingRequests();
+    const handleNewRequest = () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-requests', userId] });
     };
-
     socket.on("chat:request:received", handleNewRequest);
-
-    return () => {
-      socket.off("chat:request:received", handleNewRequest);
-    };
-  }, [userId, fetchPendingRequests]);
-
-  // Initial fetch
-  useEffect(() => {
-    fetchPendingRequests();
-  }, [fetchPendingRequests]);
+    return () => { socket.off("chat:request:received", handleNewRequest); };
+  }, [userId, queryClient]);
 
   return {
     pendingRequests,
     loading,
     error,
-    fetchPendingRequests,
-    acceptRequest,
-    rejectRequest,
-    clearError,
+    fetchPendingRequests: () => refetch(),
+    acceptRequest: async (requestId) => {
+      const res = await acceptMutation.mutateAsync(requestId);
+      return res.chatId;
+    },
+    rejectRequest: async (requestId) => {
+      const res = await rejectMutation.mutateAsync(requestId);
+      return res.success;
+    },
+    clearError: () => {},
     totalCount: pendingRequests.length,
     showNewConversation,
-     setShowNewConversation,
-     handleNewConversation
+    setShowNewConversation,
+    handleNewConversation
   };
-};
+};

@@ -98,7 +98,10 @@ export async function GET(req) {
       return unauthorizedResponse(auth.error);
     }
 
-    const drafts = await getClientDrafts(auth.userId);
+    const { searchParams } = new URL(req.url);
+    const businessId = searchParams.get("businessId") || null;
+
+    const drafts = await getClientDrafts(auth.userId, businessId);
 
     return NextResponse.json(
       {

@@ -91,7 +91,7 @@ function FreelancerPlansMain() {
         }
         if (invData.success) setInvoices(invData.invoices ?? []);
       } catch (_) {}
-      finally { setLoading(false); }
+      finally { setLoading(false); setInvoicesLoading(false); }
     };
     setInvoicesLoading(true);
     fetchAll();
@@ -160,7 +160,75 @@ function FreelancerPlansMain() {
     try {
       const html2pdf = (await import("html2pdf.js")).default;
       const el = document.createElement("div");
-      el.innerHTML = `<div style="padding:40px;font-family:Helvetica,Arial,sans-serif;color:#1A1D23;width:800px"><h1 style="color:#FF6B35">${inv.label}</h1><p>${new Date(inv.purchasedAt).toLocaleDateString()}</p>${inv.amountUSD ? `<p><strong>Amount: $${inv.amountUSD}</strong></p>` : ""}${inv.bidsAdded ? `<p>+${inv.bidsAdded} Bids Added</p>` : ""}${inv.bids ? `<p>${inv.bids} Bids Allocated</p>` : ""}${inv.planExpiry ? `<p>Valid until: ${new Date(inv.planExpiry).toLocaleDateString()}</p>` : ""}${inv.orderId ? `<p style="font-size:12px;color:#9CA3AF">${inv.orderId}</p>` : ""}<p style="margin-top:40px;color:#9CA3AF;font-size:12px">Thank you for using FreelanceHub.</p></div>`;
+      el.innerHTML = `
+        <div style="padding: 40px; font-family: 'Inter', Helvetica, Arial, sans-serif; color: #1A1D23; width: 700px; background: #fff; box-sizing: border-box;">
+          
+          <!-- Header -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #F1F5F9; padding-bottom: 20px; margin-bottom: 30px;">
+            <div>
+              <h1 style="margin: 0; color: #FF6B35; font-size: 28px; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+                FreelanceHub <span style="color: #1B365D;">Pro</span>
+              </h1>
+              <p style="margin: 8px 0 0; color: #64748B; font-size: 14px;">123 Freelance Ave, Tech City, 10001</p>
+              <p style="margin: 4px 0 0; color: #64748B; font-size: 14px;">support@freelancehub.com</p>
+            </div>
+            <div style="text-align: right;">
+              <h2 style="margin: 0; font-size: 24px; color: #1E293B; text-transform: uppercase; letter-spacing: 2px;">Invoice</h2>
+              <p style="margin: 8px 0 0; color: #64748B; font-size: 14px;">Date: <strong>${new Date(inv.purchasedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</strong></p>
+              <p style="margin: 4px 0 0; color: #64748B; font-size: 14px;">Invoice #: <strong>${inv.orderId || inv.paymentId || 'N/A'}</strong></p>
+            </div>
+          </div>
+
+          <!-- Bill To -->
+          <div style="margin-bottom: 40px;">
+            <p style="margin: 0 0 8px; color: #94A3B8; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Billed To</p>
+            <p style="margin: 0 0 4px; font-size: 16px; font-weight: 700; color: #0F172A;">${session?.user?.name || 'Customer'}</p>
+            <p style="margin: 0; font-size: 14px; color: #64748B;">${session?.user?.email || ''}</p>
+          </div>
+
+          <!-- Table -->
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+            <thead>
+              <tr>
+                <th style="padding: 12px 16px; text-align: left; background-color: #F8FAFC; color: #475569; font-size: 13px; text-transform: uppercase; border-top: 1px solid #E2E8F0; border-bottom: 2px solid #E2E8F0;">Description</th>
+                <th style="padding: 12px 16px; text-align: center; background-color: #F8FAFC; color: #475569; font-size: 13px; text-transform: uppercase; border-top: 1px solid #E2E8F0; border-bottom: 2px solid #E2E8F0;">Bids Allocated</th>
+                <th style="padding: 12px 16px; text-align: right; background-color: #F8FAFC; color: #475569; font-size: 13px; text-transform: uppercase; border-top: 1px solid #E2E8F0; border-bottom: 2px solid #E2E8F0;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding: 16px; border-bottom: 1px solid #E2E8F0; font-size: 15px; color: #1E293B;">
+                  <div style="font-weight: 600;">${inv.label}</div>
+                  ${inv.planExpiry ? '<div style="font-size: 13px; color: #64748B; margin-top: 4px;">Valid until: ' + new Date(inv.planExpiry).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) + '</div>' : ''}
+                </td>
+                <td style="padding: 16px; border-bottom: 1px solid #E2E8F0; font-size: 15px; color: #1E293B; text-align: center;">
+                  ${inv.bids || inv.bidsAdded || '-'}
+                </td>
+                <td style="padding: 16px; border-bottom: 1px solid #E2E8F0; font-size: 15px; color: #1E293B; text-align: right; font-weight: 600;">
+                  ${inv.amountUSD != null ? '$' + inv.amountUSD.toFixed(2) : 'Free'}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Total -->
+          <div style="display: flex; justify-content: flex-end; margin-bottom: 40px;">
+            <div style="width: 300px;">
+              <div style="display: flex; justify-content: space-between; padding: 12px 16px; background-color: #F8FAFC; border-radius: 8px;">
+                <span style="font-size: 16px; font-weight: 600; color: #1E293B;">Total</span>
+                <span style="font-size: 20px; font-weight: 800; color: #FF6B35;">${inv.amountUSD != null ? '$' + inv.amountUSD.toFixed(2) : 'Free'}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="text-align: center; border-top: 1px solid #F1F5F9; padding-top: 30px; margin-top: 40px;">
+            <p style="margin: 0 0 8px; font-size: 15px; font-weight: 600; color: #1E293B;">Thank you for your business!</p>
+            <p style="margin: 0; font-size: 13px; color: #94A3B8;">If you have any questions concerning this invoice, please contact support@freelancehub.com.</p>
+          </div>
+          
+        </div>
+      `;
       await html2pdf().set({ margin: 10, filename: `FreelanceHub_Invoice_${id}.pdf`, image: { type: "jpeg" as const, quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: "mm" as const, format: "a4" as const, orientation: "portrait" as const } }).from(el).save();
     } catch (e) { console.error("PDF error", e); }
     finally { setDownloadingInvoice(null); }

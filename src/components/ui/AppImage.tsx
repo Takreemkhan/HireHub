@@ -59,14 +59,28 @@ function AppImage({
     const isExternal = src.startsWith('http://') || src.startsWith('https://');
     const isDataUrl = src.startsWith('data:');
 
-    // For external URLs or data URLs, use plain img tag for reliability
-    if (isExternal || isDataUrl) {
-        const imgStyle: React.CSSProperties = fill
-            ? { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }
-            : {};
-        if (!fill && width) imgStyle.width = width;
-        if (!fill && height) imgStyle.height = height;
+    // List of domains configured in next.config.mjs for optimization
+    const OPTIMIZED_DOMAINS = [
+        'images.unsplash.com',
+        'images.pexels.com',
+        'images.pixabay.com',
+        'img.rocket.new',
+        'lh3.googleusercontent.com',
+        'res.cloudinary.com'
+    ];
 
+    let isOptimizedDomain = false;
+    if (isExternal) {
+        try {
+            const url = new URL(src);
+            isOptimizedDomain = OPTIMIZED_DOMAINS.includes(url.hostname);
+        } catch (e) {
+            isOptimizedDomain = false;
+        }
+    }
+
+    // For data URLs or unoptimized external domains, use plain img tag
+    if (isDataUrl || (isExternal && !isOptimizedDomain)) {
         return (
             <img
                 src={src}
@@ -74,24 +88,24 @@ function AppImage({
                 className={className}
                 onError={handleError}
                 onClick={onClick}
-                style={imgStyle}
+                style={fill ? { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' } : { width, height }}
                 {...props}
             />
         );
     }
 
-    // For local images, use Next.js Image
+    // For local and whitelisted external images, use Next.js Image
     if (fill) {
         return (
-            <div className={`relative ${className}`}>
+            <div className={`relative ${className}`} style={{ width: '100%', height: '100%' }}>
                 <Image
                     src={src}
                     alt={alt}
                     fill
-                    sizes={sizes || '100vw'}
+                    sizes={sizes || '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'}
                     style={{ objectFit: 'cover' }}
                     priority={priority}
-                    unoptimized
+                    quality={quality}
                     onError={handleError}
                     onClick={onClick}
                     {...props}
@@ -108,7 +122,7 @@ function AppImage({
             height={height || 300}
             className={className}
             priority={priority}
-            unoptimized
+            quality={quality}
             onError={handleError}
             onClick={onClick}
             {...props}

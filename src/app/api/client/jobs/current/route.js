@@ -13,8 +13,9 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page")) || 1;
     const limit = parseInt(searchParams.get("limit")) || 100;
+    const businessId = searchParams.get("businessId") || null;
 
-    const result = await getClientCurrentJobs(auth.userId, page, limit);
+    const result = await getClientCurrentJobs(auth.userId, page, limit, businessId);
 
     return NextResponse.json(
       {

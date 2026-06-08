@@ -69,8 +69,8 @@ export default function SubmitProposalModal({ job, onClose, onBitUsed }: SubmitP
     fetch('/api/freelancer/plans', { credentials: 'include' })
       .then(r => r.json())
       .then(d => {
-        setIsPlanActive(d?.subscription?.isPlanActive ?? false);
-        setMaxVideos(d?.subscription?.maxVideos ?? 3);
+        setIsPlanActive(d?.subscription?.planKey && d.subscription.planKey !== 'basic');
+        setMaxVideos(d?.subscription?.maxVideos || (d?.subscription?.planKey === 'plus' ? 3 : 0));
       })
       .catch(() => setIsPlanActive(false));
   }, []);

@@ -25,18 +25,27 @@ export const saveDraftJob = async (data) => {
 };
 
 /* GET ALL DRAFTS FOR A CLIENT */
-export const getClientDrafts = async (clientId) => {
+export const getClientDrafts = async (clientId, businessId = null) => {
   const client = await clientPromise;
   const db = client.db(DB_NAME);
 
   console.log("Getting drafts for clientId:", clientId);  // ⭐ Debug log
 
+  const query = { 
+    $or: [
+      { clientId: new ObjectId(clientId) },
+      { clientId: clientId.toString() }
+    ],
+    isDraft: true,
+    status: "draft"
+  };
+
+  if (businessId) {
+    query.businessPageId = new ObjectId(businessId);
+  }
+
   const drafts = await db.collection(COLLECTIONS.JOBS)
-    .find({ 
-      clientId: new ObjectId(clientId),
-      isDraft: true,
-      status: "draft"
-    })
+    .find(query)
     .sort({ updatedAt: -1 })
     .toArray();
 

@@ -1,14 +1,16 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import Icon from "@/components/ui/AppIcon";
 import { usePendingRequests } from "@/app/hook/usePendingRequests";
 import NewConversationModal from "@/app/components/chat/NewConversationModal";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { connectSocket } from "@/socket/socket";
+import { Building2, ChevronDown, Plus } from "lucide-react";
+import { useBusinessPages } from "@/app/hook/useBusinessPages";
 
 interface HeaderProps {
   className?: string;
@@ -17,9 +19,13 @@ interface HeaderProps {
 const Header = ({ className = "" }: HeaderProps) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [bpDropdownOpen, setBpDropdownOpen] = useState(false);
+  const bpDropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session, status } = useSession();
   const userId = session?.user?.id;
+  const isFreelancerUser = (session?.user as any)?.role === "freelancer";
 
   const {
     showNewConversation,
@@ -35,7 +41,20 @@ const Header = ({ className = "" }: HeaderProps) => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  useEffect(() => { setIsMobileMenuOpen(false); }, [pathname]);
+  useEffect(() => { setIsMobileMenuOpen(false); setBpDropdownOpen(false); }, [pathname]);
+
+  // Close BP dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (bpDropdownRef.current && !bpDropdownRef.current.contains(e.target as Node)) {
+        setBpDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const { data: businessPages = [] } = useBusinessPages(userId, isFreelancerUser);
 
   useEffect(() => {
     document.body.style.overflow = isMobileMenuOpen ? "hidden" : "unset";
@@ -181,6 +200,64 @@ const Header = ({ className = "" }: HeaderProps) => {
                 <span>Dashboard</span>
               </Link>
             )}
+
+            {/* ── Business Page Button / Dropdown (freelancers only) ─── */}
+            {session?.user && isFreelancerUser && (
+              businessPages.length === 0 ? (
+                <Link
+                  href="/create-business-page"
+                  className="flex items-center space-x-2 px-4 py-2 rounded-lg font-body font-medium transition-all duration-300 text-foreground hover:bg-muted hover:text-primary shadow-sm"
+                >
+                  <Plus size={16} />
+                  <span>Business Page</span>
+                </Link>
+              ) : (
+                <div className="relative" ref={bpDropdownRef}>
+                  <button
+                    onClick={() => setBpDropdownOpen(!bpDropdownOpen)}
+                    className="flex items-center space-x-2 px-4 py-2 rounded-lg font-body font-medium transition-all duration-300 text-foreground hover:bg-muted hover:text-primary shadow-sm"
+                  >
+                    <Building2 size={16} />
+                    <span>Business Pages</span>
+                    <ChevronDown size={14} className={`transition-transform ${bpDropdownOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {bpDropdownOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50">
+                      <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Your Business Pages</p>
+                      </div>
+                      {businessPages.map((bp: any) => (
+                        <button
+                          key={bp._id}
+                          onClick={() => { router.push(`/business-dashboard/${bp._id}`); setBpDropdownOpen(false); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-orange-50 transition-colors text-left group"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-[#1B365D] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                            {bp.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-800 truncate">{bp.name}</p>
+                            <p className="text-xs text-gray-400">Business Dashboard</p>
+                          </div>
+                          <Icon name="ChevronRightIcon" size={14} className="text-gray-300 group-hover:text-orange-400 transition-colors" />
+                        </button>
+                      ))}
+                      <div className="border-t border-gray-100">
+                        <button
+                          onClick={() => { router.push("/create-business-page"); setBpDropdownOpen(false); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
+                            <Plus size={16} className="text-gray-500" />
+                          </div>
+                          <span className="text-sm font-medium text-gray-600">Create New Page</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            )}
           </nav>
 
           <div className="flex items-center space-x-2">
@@ -289,6 +366,25 @@ const Header = ({ className = "" }: HeaderProps) => {
                   <Icon name="UserCircleIcon" size={22} />
                   <span>Dashboard</span>
                 </Link>
+
+                {/* ── Business Pages (mobile) ── */}
+                {isFreelancerUser && (
+                  <div className="pt-3 border-t border-border mt-2">
+                    <p className="px-4 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Business Pages</p>
+                    {businessPages.map((bp: any) => (
+                      <Link key={bp._id} href={`/business-dashboard/${bp._id}`}
+                        className="flex items-center space-x-3 px-4 py-3 rounded-lg font-body font-medium text-foreground hover:bg-muted hover:text-primary transition-all">
+                        <Building2 size={22} />
+                        <span>{bp.name}</span>
+                      </Link>
+                    ))}
+                    <Link href="/create-business-page"
+                      className="flex items-center space-x-3 px-4 py-3 rounded-lg font-body font-medium text-[#FF6B35] hover:bg-orange-50 transition-all">
+                      <Plus size={22} />
+                      <span>{businessPages.length === 0 ? "+ Business Page" : "Create New Page"}</span>
+                    </Link>
+                  </div>
+                )}
               </>
             )}
 

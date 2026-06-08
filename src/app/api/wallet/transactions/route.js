@@ -20,6 +20,7 @@ export async function GET(req) {
         const { searchParams } = new URL(req.url);
         const type = searchParams.get("type") || "all";
         const source = searchParams.get("source") || "all"; // 'wallet' or 'all'
+        const viewMode = searchParams.get("viewMode") || "all";
         const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
         const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
         const skip = (page - 1) * limit;
@@ -32,6 +33,12 @@ export async function GET(req) {
 
         if (type === "credit") query.type = "credit";
         if (type === "debit") query.type = "debit";
+
+        if (viewMode === "freelancer") {
+            query.category = { $in: ["withdrawal", "platform_fee", "milestone_release"] };
+        } else if (viewMode === "business" || viewMode === "client") {
+            query.category = { $in: ["topup", "escrow_deposit", "escrow_refund", "payment"] };
+        }
 
         // Professional Filter: If source=wallet, only show transactions that affected the wallet balance
         // Top-ups, withdrawals, and payments explicitly marked as 'source: wallet'
@@ -62,7 +69,8 @@ export async function GET(req) {
             },
             {
                 $addFields: {
-                    projectTitle: { $ifNull: [{ $arrayElemAt: ["$jobInfo.title", 0] }, "N/A"] }
+                    projectTitle: { $ifNull: [{ $arrayElemAt: ["$jobInfo.title", 0] }, "N/A"] },
+                    businessPageId: { $ifNull: [{ $arrayElemAt: ["$jobInfo.businessPageId", 0] }, "$businessPageId", null] }
                 }
             },
             { $project: { jobInfo: 0 } }

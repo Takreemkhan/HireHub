@@ -76,10 +76,10 @@ export const useFreelancerCategories = () => {
   });
 };
 
-export const useCurrentJobsClients = () => {
+export const useCurrentJobsClients = (businessId?: string) => {
   return useQuery({
-    queryKey: ["current-jobs-clients"],
-    queryFn: getCurrentJobs,
+    queryKey: ["current-jobs-clients", businessId],
+    queryFn: () => getCurrentJobs(businessId),
   });
 };
 
@@ -135,13 +135,20 @@ export const usegetFreelancerActivity = () => {
 
 
 // get all freelancer profiles
-export const usegetAllFreelancerProfiles = () => {
+export const usegetAllFreelancerProfiles = (params: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  skills?: string[];
+  minRate?: number;
+  maxRate?: number;
+  location?: string;
+} = {}) => {
   return useQuery({
-    queryKey: ["get-all-freelancer-profiles"],
-    queryFn: getAllFreelancerProfiles,
+    queryKey: ["get-all-freelancer-profiles", params],
+    queryFn: () => getAllFreelancerProfiles(params),
+    staleTime: 60_000, // 1 minute
   });
-
-
 };
 
 // client send message to freelancer 
@@ -215,17 +222,17 @@ export const useGetClientMembershipPlan = () => {
   });
 };
 
-export const useGetClientDrafts = () => {
+export const useGetClientDrafts = (businessId?: string) => {
   return useQuery({
-    queryKey: ["get-client-drafts"],
-    queryFn: getClientDrafts,
+    queryKey: ["get-client-drafts", businessId],
+    queryFn: () => getClientDrafts(businessId),
   });
 };
 
-export const useCompletedJobs = (page = 1, limit = 10) => {
+export const useCompletedJobs = (page = 1, limit = 10, businessId?: string) => {
   return useQuery({
-    queryKey: ["completed-jobs", page, limit],
-    queryFn: () => getClientCompletedJobs(page, limit),
+    queryKey: ["completed-jobs", page, limit, businessId],
+    queryFn: () => getClientCompletedJobs(page, limit, businessId),
   });
 };
 

@@ -28,7 +28,10 @@ function ClientGuard({ children }: { children: React.ReactNode }) {
     // ✅ Only redirect if role is EXPLICITLY "freelancer"
     if (session.user?.role === "freelancer" && !hasRedirected.current) {
       hasRedirected.current = true;
-      const newPath = pathname.replace('/client', '/freelancer');
+      let newPath = pathname.replace('/client', '/freelancer');
+      if (typeof window !== 'undefined' && window.location.search) {
+        newPath += window.location.search;
+      }
       router.replace(newPath);
       return;
     }

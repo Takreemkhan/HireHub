@@ -275,11 +275,13 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { Plus, MoreVertical, Trash2, Edit, Send, Clock, FileText } from 'lucide-react';
 
 export default function DraftSection() {
   const router = useRouter();
+  const params = useParams();
+  const businessId = params?.businessId as string | undefined;
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const menuRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
@@ -300,7 +302,8 @@ export default function DraftSection() {
 
       console.log('📥 Fetching drafts from GET /api/jobs/drafts...');
 
-      const res = await fetch('/api/jobs/drafts');
+      const fetchUrl = businessId ? `/api/jobs/drafts?businessId=${businessId}` : '/api/jobs/drafts';
+      const res = await fetch(fetchUrl);
       const data = await res.json();
 
       console.log('📦 Drafts response:', data);
@@ -558,7 +561,7 @@ export default function DraftSection() {
 
           {/* Create New Card */}
           <div
-            onClick={() => router.push("/post-page")}
+            onClick={() => router.push(businessId ? `/post-page?businessId=${businessId}` : "/post-page")}
             className="border-2 border-dashed border-gray-300 rounded-lg bg-white hover:bg-gray-50 hover:border-[#FF6B35] transition cursor-pointer flex items-center justify-center min-h-[280px]"
           >
             <div className="text-center p-6">

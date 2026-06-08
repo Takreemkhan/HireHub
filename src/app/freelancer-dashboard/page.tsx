@@ -358,22 +358,26 @@ function FreelancerDashboardInner({ id }: { id: string }) {
                     </span>
                   </div>
 
-                  {planInfo.isPlus && planInfo.planExpiry && (
-                    <p className="text-xs text-gray-400 mb-2">
-                      {planInfo.billingCycle === 'yearly' ? 'Yearly' : 'Monthly'} ·
-                      Expires {new Date(planInfo.planExpiry).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </p>
-                  )}
+                  <div className="flex items-center justify-between mt-1">
+                    {planInfo.isPlus && planInfo.planExpiry ? (
+                      <p className="text-xs text-gray-400">
+                        {planInfo.billingCycle === 'yearly' ? 'Yearly' : 'Monthly'} ·
+                        Expires {new Date(planInfo.planExpiry).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    ) : (
+                      <div />
+                    )}
 
-                  <span
-                    className="text-xs font-semibold px-2.5 py-1 rounded-lg"
-                    style={{
-                      backgroundColor: planInfo.isPlus ? '#dcfce7' : '#fff7ed',
-                      color: planInfo.isPlus ? '#16a34a' : '#ea580c',
-                    }}
-                  >
-                    {planInfo.isPlus ? '✓ Active' : 'Upgrade to Plus →'}
-                  </span>
+                    <span
+                      className="text-xs font-semibold px-2.5 py-1 rounded-lg shrink-0"
+                      style={{
+                        backgroundColor: planInfo.isPlus ? '#dcfce7' : '#fff7ed',
+                        color: planInfo.isPlus ? '#16a34a' : '#ea580c',
+                      }}
+                    >
+                      {planInfo.isPlus ? '✓ Active' : 'Upgrade to Plus →'}
+                    </span>
+                  </div>
                 </div>
 
                 {/* ── Bids Balance Widget ──────────────────────────────── */}

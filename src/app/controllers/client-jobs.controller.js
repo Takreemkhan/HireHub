@@ -10,7 +10,7 @@ const toObjectId = (id) => {
 };
 
 /* GET CLIENT'S CURRENT JOBS (Open + In-Progress) */
-export const getClientCurrentJobs = async (clientId, page = 1, limit = 100) => {
+export const getClientCurrentJobs = async (clientId, page = 1, limit = 100, businessId = null) => {
   const client = await clientPromise;
   const db = client.db(DB_NAME);
 
@@ -27,6 +27,10 @@ export const getClientCurrentJobs = async (clientId, page = 1, limit = 100) => {
     status: { $in: ["open", "in-progress", "in progress"] }
   };
 
+  if (businessId) {
+    currentQuery.businessPageId = toObjectId(businessId);
+  }
+
   // Statuses for "Total" according to user: open, completed, in-progress
   const totalQuery = {
     $or: [
@@ -36,6 +40,10 @@ export const getClientCurrentJobs = async (clientId, page = 1, limit = 100) => {
     isDraft: { $ne: true },
     status: { $in: ["open", "in-progress", "in progress", "completed"] }
   };
+
+  if (businessId) {
+    totalQuery.businessPageId = toObjectId(businessId);
+  }
 
   const [jobs, totalCurrent, totalCompleted, openCount, inProgressCount, totalAllSidebar] = await Promise.all([
     db.collection(COLLECTIONS.JOBS).aggregate([
@@ -129,7 +137,7 @@ export const getClientCurrentJobs = async (clientId, page = 1, limit = 100) => {
 };
 
 /* GET CLIENT'S COMPLETED JOBS (with reviews & duration) */
-export const getClientCompletedJobs = async (clientId, page = 1, limit = 100) => {
+export const getClientCompletedJobs = async (clientId, page = 1, limit = 100, businessId = null) => {
   const client = await clientPromise;
   const db = client.db(DB_NAME);
 
@@ -145,6 +153,10 @@ export const getClientCompletedJobs = async (clientId, page = 1, limit = 100) =>
     status: "completed"
   };
 
+  if (businessId) {
+    query.businessPageId = toObjectId(businessId);
+  }
+
   // Statuses for "Total" according to user: open, completed, in-progress
   const totalQuery = {
     $or: [
@@ -154,6 +166,10 @@ export const getClientCompletedJobs = async (clientId, page = 1, limit = 100) =>
     isDraft: { $ne: true },
     status: { $in: ["open", "in-progress", "in progress", "completed"] }
   };
+
+  if (businessId) {
+    totalQuery.businessPageId = toObjectId(businessId);
+  }
 
   const [jobs, totalCompleted, totalSidebar] = await Promise.all([
     db.collection(COLLECTIONS.JOBS).aggregate([

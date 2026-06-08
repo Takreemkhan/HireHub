@@ -51,9 +51,11 @@ export const createPaymentOrder = async (clientId, jobData) => {
 
   const amountInPaise = Math.round(totalAmount * 100);
 
+  const reqCurrency = jobData.currency || "INR";
+
   const razorpayOrder = await razorpay.orders.create({
     amount: amountInPaise,
-    currency: "INR",
+    currency: reqCurrency,
     receipt: `job_${Date.now()}`,
     notes: { clientId: clientId.toString(), jobBudget, platformCommission, featuredFee, totalAmount }
   });
@@ -83,7 +85,8 @@ export const createPaymentOrder = async (clientId, jobData) => {
     status: jobData.payLater ? "open" : "payment_pending",
     proposalCount: 0,
     createdAt: new Date(),
-    updatedAt: new Date()
+    updatedAt: new Date(),
+    businessPageId: jobData.businessPageId ? new ObjectId(jobData.businessPageId) : null
   };
 
   const result = await db.collection(COLLECTIONS.JOBS).insertOne(jobToSave);
@@ -109,7 +112,7 @@ export const createPaymentOrder = async (clientId, jobData) => {
   return {
     orderId: razorpayOrder.id,
     amountInPaise,
-    currency: "INR",
+    currency: reqCurrency,
     jobBudget,
     platformCommission,
     featuredFee,
@@ -144,9 +147,11 @@ export const createSplitPaymentOrder = async (clientId, jobData) => {
 
   const amountInPaise = Math.round(remainingAmount * 100);
 
+  const reqCurrency = jobData.currency || "INR";
+
   const razorpayOrder = await razorpay.orders.create({
     amount: amountInPaise,
-    currency: "INR",
+    currency: reqCurrency,
     receipt: `job_split_${Date.now()}`,
     notes: {
       clientId: clientId.toString(),
@@ -184,7 +189,8 @@ export const createSplitPaymentOrder = async (clientId, jobData) => {
     status: jobData.payLater ? "open" : "payment_pending",
     proposalCount: 0,
     createdAt: new Date(),
-    updatedAt: new Date()
+    updatedAt: new Date(),
+    businessPageId: jobData.businessPageId ? new ObjectId(jobData.businessPageId) : null
   };
 
   const result = await db.collection(COLLECTIONS.JOBS).insertOne(jobToSave);
@@ -211,7 +217,7 @@ export const createSplitPaymentOrder = async (clientId, jobData) => {
     orderId: razorpayOrder.id,
     amount: remainingAmount,
     amountInPaise,
-    currency: "INR",
+    currency: reqCurrency,
     jobBudget,
     platformCommission,
     featuredFee,
@@ -323,6 +329,19 @@ export const verifySplitPaymentAndPublishJob = async (paymentData) => {
     createdAt: new Date()
   });
 
+  // Also log the Razorpay portion to wallet_transactions for unified history
+  await db.collection(COLLECTIONS.WALLET_TRANSACTIONS).insertOne({
+    userId: existingJob.clientId,
+    type: "debit",
+    category: "payment",
+    source: "razorpay", // Ensures it doesn't show in Wallet-only history
+    amount: payment.amount / 100,
+    description: `Direct payment portion for split payment: ${existingJob.title || "Job Posting"}`,
+    jobId: new ObjectId(jobId),
+    status: payment.status === "captured" ? "completed" : payment.status,
+    createdAt: new Date()
+  });
+
   notifyMatchingFreelancers(db, new ObjectId(jobId), publishedJob).catch((err) =>
     console.warn("⚠️ Recommended notifications failed:", err.message)
   );
@@ -405,6 +424,19 @@ export const verifyPaymentAndPublishJob = async (paymentData) => {
     currency: payment.currency,
     status: payment.status,
     method: payment.method,
+    createdAt: new Date()
+  });
+
+  // Also log to wallet_transactions so it appears in unified transaction history
+  await db.collection(COLLECTIONS.WALLET_TRANSACTIONS).insertOne({
+    userId: existingJob.clientId, // Client's ID
+    type: "debit",
+    category: "payment",
+    source: "razorpay", // Ensures it doesn't show in Wallet-only history
+    amount: amountPaid,
+    description: `Direct payment for job: ${existingJob.title || "Job Posting"}`,
+    jobId: new ObjectId(jobId),
+    status: payment.status === "captured" ? "completed" : payment.status,
     createdAt: new Date()
   });
 
@@ -540,9 +572,11 @@ export const createEscrowPaymentOrder = async (clientId, jobId) => {
   const totalAmount = jobBudget + platformCommission;
   const amountInPaise = Math.round(totalAmount * 100);
 
+  const reqCurrency = existingJob.currency || "INR";
+
   const razorpayOrder = await razorpay.orders.create({
     amount: amountInPaise,
-    currency: "INR",
+    currency: reqCurrency,
     receipt: `escrow_${Date.now()}`,
     notes: { clientId: clientId.toString(), jobId: jobId.toString(), type: "escrow_assignment", totalAmount }
   });
@@ -561,7 +595,7 @@ export const createEscrowPaymentOrder = async (clientId, jobId) => {
   return {
     orderId: razorpayOrder.id,
     amountInPaise,
-    currency: "INR",
+    currency: reqCurrency,
     jobBudget,
     platformCommission,
     totalAmount,

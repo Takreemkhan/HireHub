@@ -440,8 +440,12 @@ const AVAIL_ID_TO_LABEL: Record<string, string> = {
   'month': 'Within a Month',
 };
 
+import { useDebounce } from '@/hooks/useDebounce';
+import { usegetAllFreelancerProfiles } from '@/app/hook/useProfile';
+
 // Helper to consolidate fragmented titles into professional categories
 const getCanonicalCategory = (title: string): string => {
+  if (!title) return 'Freelancer';
   const t = title.toLowerCase().trim();
   if (t.includes('mern')) return 'MERN Stack';
   if (t.includes('full stack') || t.includes('full-stack') || t.includes('fullstack')) return 'Full-Stack Development';
@@ -452,7 +456,6 @@ const getCanonicalCategory = (title: string): string => {
   if (t.includes('data') || t.includes('machine learning') || t.includes('ml') || t.includes('ai')) return 'Data Science & AI';
   if (t.includes('junior')) return 'Junior Developer';
   if (t.includes('senior')) return 'Senior Developer';
-  // Fallback: Capitalize first letters
   return title.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 };
 
@@ -469,10 +472,10 @@ function mapProfile(profile: any): Freelancer {
     id: profile.userId || profile._id || '',
     name: profile.name || 'Unknown',
     title: profile.title || 'Freelancer',
-    image: profile.image || profile.profileImage || null,
+    image: profile.profileImage || profile.image || null,
     alt: `${profile.name || 'Freelancer'} profile photo`,
     hourlyRate: Number(profile.hourlyRate) || 0,
-    rating: (Array.isArray(profile.reviews) && profile.reviews.length === 0) ? 0 : Number(profile.rating) || 0,
+    rating: Number(profile.rating) || 0,
     reviewCount: Array.isArray(profile.reviews) ? profile.reviews.length : 0,
     completedProjects: profile.completedJobs || 0,
     skills,
@@ -500,43 +503,22 @@ const FreelancerProfilesInteractive = () => {
     verified: false,
   });
 
-  // Master list — ALL profiles from API, never filtered at fetch time
-  const [allProfiles, setAllProfiles] = React.useState<Freelancer[]>([]);
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const hasFetched = useRef(false);
+  const debouncedSearch = useDebounce(searchQuery, 500);
 
   useEffect(() => { setIsHydrated(true); }, []);
 
   const { data: session, status: sessionStatus } = useSession();
   const [savedIds, setSavedIds] = React.useState<Set<string>>(new Set());
 
-  // ─── Fetch ALL profiles once on mount (no search/filter params) ──────────────
-  // Reason: the backend does NOT search the `name` field, so passing a search
-  // param causes it to return wrong results (e.g. matches "about" text instead
-  // of the person's actual name). We fetch everything and filter 100% client-side.
-  const fetchAllProfiles = useCallback(async () => {
-    if (hasFetched.current) return;
-    hasFetched.current = true;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const res = await fetch('/api/freelancer/profile?limit=500');
-      const data = await res.json();
-
-      if (!data.success) throw new Error(data.message || 'Failed to fetch profiles');
-
-      setAllProfiles((data.profiles || []).map(mapProfile));
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong');
-      setAllProfiles([]);
-      hasFetched.current = false; // allow retry
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Use the optimized React Query hook for profiles
+  const { data, isLoading, isError, error } = usegetAllFreelancerProfiles({
+    page: currentPage,
+    limit: LIMIT,
+    search: debouncedSearch,
+    skills: filters.skills.length > 0 ? filters.skills : undefined,
+    minRate: filters.priceRange[0] > 0 ? filters.priceRange[0] : undefined,
+    maxRate: filters.priceRange[1] < 200 ? filters.priceRange[1] : undefined,
+  });
 
   const fetchSavedFreelancers = useCallback(async () => {
     try {
@@ -551,144 +533,16 @@ const FreelancerProfilesInteractive = () => {
   }, []);
 
   useEffect(() => {
-    if (isHydrated) fetchAllProfiles();
-  }, [isHydrated, fetchAllProfiles]);
-
-  useEffect(() => {
     if (sessionStatus === "authenticated") {
       fetchSavedFreelancers();
     }
   }, [sessionStatus, fetchSavedFreelancers]);
 
-  // ─── Client-side: search + filter + sort + paginate ──────────────────────────
-  const { pageItems, pagination, categoryCounts, skillCounts } = React.useMemo(() => {
-    let list = [...allProfiles];
-
-    // ── 1. Search (name, title, skills) ────────────────────────────────────────
-    // The backend doesn't search `name` — we handle ALL searching here instead.
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      list = list.filter(f =>
-        f.name.toLowerCase().includes(q) ||
-        f.title.toLowerCase().includes(q) ||
-        f.skills.some(s => s.name.toLowerCase().includes(q))
-      );
-    }
-
-    if (filters.categories.length > 0) {
-      const selectedCats = filters.categories.map((c: string) => c.toLowerCase());
-      list = list.filter(f =>
-        selectedCats.includes(getCanonicalCategory(f.title).toLowerCase())
-      );
-    }
-
-    // ── 2. Skills filter (case-insensitive) ────────────────────────────────────
-    // Backend $in is case-sensitive, so we do this client-side too.
-    if (filters.skills.length > 0) {
-      const selectedSkillNames = filters.skills.map(id =>
-        (SKILL_ID_TO_NAME[id] || id).toLowerCase()
-      );
-      list = list.filter(f =>
-        selectedSkillNames.every(selected =>
-          f.skills.some(s => s.name.toLowerCase() === selected)
-        )
-      );
-    }
-
-    // ── 3. Price range ──────────────────────────────────────────────────────────
-    if (filters.priceRange[0] > 0) {
-      list = list.filter(f => f.hourlyRate >= filters.priceRange[0]);
-    }
-    if (filters.priceRange[1] < 200) {
-      list = list.filter(f => f.hourlyRate <= filters.priceRange[1]);
-    }
-
-    // ── 4. Availability ─────────────────────────────────────────────────────────
-    if (filters.availability.length > 0) {
-      const labels = filters.availability
-        .map(id => AVAIL_ID_TO_LABEL[id])
-        .filter(Boolean);
-      list = list.filter(f => labels.includes(f.availability));
-    }
-
-    // ── 5. Rating floor ─────────────────────────────────────────────────────────
-    if (filters.rating > 0) {
-      list = list.filter(f => f.rating >= filters.rating);
-    }
-
-    // ── 6. Verified only ────────────────────────────────────────────────────────
-    if (filters.verified) {
-      list = list.filter(f => f.verified);
-    }
-
-    // ── 7. Sort ─────────────────────────────────────────────────────────────────
-    switch (sortBy) {
-      case 'rating':
-        list.sort((a, b) => b.rating - a.rating);
-        break;
-      case 'price-low':
-        list.sort((a, b) => a.hourlyRate - b.hourlyRate);
-        break;
-      case 'price-high':
-        list.sort((a, b) => b.hourlyRate - a.hourlyRate);
-        break;
-      case 'experience':
-        list.sort((a, b) => b.completedProjects - a.completedProjects);
-        break;
-      // 'recommended' / 'recent' → keep API order (rating desc by default)
-    }
-
-    // ── 8. Paginate ─────────────────────────────────────────────────────────────
-    const total = list.length;
-    const totalPages = Math.max(1, Math.ceil(total / LIMIT));
-    const safePage = Math.min(currentPage, totalPages);
-    const start = (safePage - 1) * LIMIT;
-    const catCounts: Record<string, number> = {};
-    const skCounts: Record<string, number> = {};
-
-    allProfiles.forEach(f => {
-      // Categories
-      const cat = getCanonicalCategory(f.title);
-      catCounts[cat] = (catCounts[cat] || 0) + 1;
-
-      // Skills
-      f.skills.forEach(s => {
-        let name = typeof s === 'string' ? s : (s as any).name || '';
-        if (!name) return;
-        
-        let key = name.trim().toLowerCase();
-        
-        // Canonicalize Node.js variations
-        if (key.includes('node')) key = 'node';
-        
-        skCounts[key] = (skCounts[key] || 0) + 1;
-      });
-    });
-
-    return {
-      pageItems: list.slice(start, start + LIMIT),
-      pagination: {
-        total,
-        page: safePage,
-        limit: LIMIT,
-        totalPages,
-        hasNext: safePage < totalPages,
-        hasPrev: safePage > 1,
-      } as PaginationInfo,
-      categoryCounts: catCounts,
-      skillCounts: skCounts
-    };
-  }, [allProfiles, searchQuery, filters, sortBy, currentPage]);
-
-  // Reset to page 1 whenever search/filter/sort changes (not page itself)
-  const prevKeyRef = useRef('');
+  // Reset to page 1 when search or filters change
   useEffect(() => {
-    const key = `${searchQuery}|${JSON.stringify(filters)}|${sortBy}`;
-    if (prevKeyRef.current && prevKeyRef.current !== key) setCurrentPage(1);
-    prevKeyRef.current = key;
-  }, [searchQuery, filters, sortBy]);
+    setCurrentPage(1);
+  }, [debouncedSearch, filters]);
 
-  // ─── Handlers ────────────────────────────────────────────────────────────────
   const handleSearch = (query: string) => setSearchQuery(query);
   const handleSortChange = (sort: string) => setSortBy(sort);
   const handleViewChange = (v: 'grid' | 'list') => setView(v);
@@ -698,14 +552,26 @@ const FreelancerProfilesInteractive = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const freelancers = React.useMemo(() => {
+    if (!data?.profiles) return [];
+    return data.profiles.map(mapProfile);
+  }, [data]);
+
+  const pagination = data?.pagination || {
+    total: 0,
+    page: 1,
+    limit: LIMIT,
+    totalPages: 1,
+    hasNext: false,
+    hasPrev: false,
+  };
+
   const startIdx = pagination.total === 0 ? 0 : (pagination.page - 1) * LIMIT + 1;
   const endIdx = Math.min(pagination.page * LIMIT, pagination.total);
 
-  // ─── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background pt-20 pb-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-
         <div className="mb-8">
           <h1 className="text-4xl font-display font-bold text-foreground mb-3">
             Discover Top Talent
@@ -720,26 +586,17 @@ const FreelancerProfilesInteractive = () => {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8">
-
-          {/* Sidebar */}
           <div className="lg:w-80 flex-shrink-0">
-            <FilterSidebar 
-              onFilterChange={handleFilterChange} 
-              categoryCounts={categoryCounts}
-              skillCounts={skillCounts}
-            />
+            <FilterSidebar onFilterChange={handleFilterChange} />
           </div>
 
-          {/* Main */}
           <div className="flex-1">
-
-            {/* Toolbar */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
               <div className="text-sm text-muted-foreground">
-                {loading ? (
-                  <span>Loading freelancers…</span>
-                ) : error ? (
-                  <span className="text-destructive">{error}</span>
+                {isLoading ? (
+                  <span>Loading freelancers...</span>
+                ) : isError ? (
+                  <span className="text-destructive">{(error as any)?.message || 'Error loading profiles'}</span>
                 ) : (
                   <>
                     Showing{' '}
@@ -755,8 +612,7 @@ const FreelancerProfilesInteractive = () => {
               </div>
             </div>
 
-            {/* Loading skeleton */}
-            {loading && (
+            {isLoading && (
               <div className={`grid gap-6 mb-8 ${view === 'grid' ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1'}`}>
                 {[...Array(6)].map((_, i) => (
                   <div key={i} className="bg-card rounded-xl border border-border p-6 animate-pulse">
@@ -765,40 +621,17 @@ const FreelancerProfilesInteractive = () => {
                       <div className="flex-1 space-y-2">
                         <div className="h-4 bg-muted rounded w-3/4" />
                         <div className="h-3 bg-muted rounded w-1/2" />
-                        <div className="h-3 bg-muted rounded w-2/3" />
                       </div>
                     </div>
                     <div className="h-px bg-border mb-4" />
-                    <div className="space-y-2">
-                      <div className="h-3 bg-muted rounded w-full" />
-                      <div className="h-3 bg-muted rounded w-4/5" />
-                    </div>
-                    <div className="flex gap-2 mt-4">
-                      <div className="h-10 bg-muted rounded-lg flex-1" />
-                      <div className="h-10 w-12 bg-muted rounded-lg" />
-                    </div>
+                    <div className="h-3 bg-muted rounded w-full mb-2" />
+                    <div className="h-3 bg-muted rounded w-2/3" />
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Error */}
-            {!loading && error && (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <Icon name="ExclamationCircleIcon" size={48} className="text-destructive mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">Failed to load freelancers</h3>
-                <p className="text-muted-foreground mb-4">{error}</p>
-                <button
-                  onClick={() => { hasFetched.current = false; fetchAllProfiles(); }}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-opacity-90 transition-all"
-                >
-                  Try Again
-                </button>
-              </div>
-            )}
-
-            {/* Empty */}
-            {!loading && !error && pageItems.length === 0 && (
+            {!isLoading && !isError && freelancers.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <Icon name="UserGroupIcon" size={48} className="text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold text-foreground mb-2">No freelancers found</h3>
@@ -806,34 +639,27 @@ const FreelancerProfilesInteractive = () => {
               </div>
             )}
 
-            {/* Cards */}
-            {!loading && !error && pageItems.length > 0 && (
+            {!isLoading && !isError && freelancers.length > 0 && (
               <div className={`grid gap-6 mb-8 ${view === 'grid' ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1'}`}>
-                {pageItems.map((freelancer) => (
+                {freelancers.map((freelancer) => (
                   <FreelancerCard key={freelancer.id} {...freelancer} isSavedInitial={savedIds.has(String(freelancer.id))} />
                 ))}
               </div>
             )}
 
-            {/* Pagination */}
-            {!loading && !error && pagination.totalPages > 1 && (
+            {!isLoading && !isError && pagination.totalPages > 1 && (
               <div className="flex items-center justify-center gap-2">
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={!pagination.hasPrev}
                   className="p-2 rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label="Previous page"
                 >
                   <Icon name="ChevronLeftIcon" size={20} />
                 </button>
 
                 {[...Array(pagination.totalPages)].map((_, i) => {
                   const page = i + 1;
-                  if (
-                    page === 1 ||
-                    page === pagination.totalPages ||
-                    (page >= currentPage - 1 && page <= currentPage + 1)
-                  ) {
+                  if (page === 1 || page === pagination.totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
                     return (
                       <button
                         key={page}
@@ -841,14 +667,14 @@ const FreelancerProfilesInteractive = () => {
                         className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${currentPage === page
                           ? 'bg-primary text-primary-foreground'
                           : 'border border-border hover:bg-muted text-foreground'
-                          }`}
+                        }`}
                       >
                         {page}
                       </button>
                     );
                   }
                   if (page === currentPage - 2 || page === currentPage + 2) {
-                    return <span key={page} className="px-1 text-muted-foreground">…</span>;
+                    return <span key={page} className="px-1 text-muted-foreground">...</span>;
                   }
                   return null;
                 })}
@@ -857,7 +683,6 @@ const FreelancerProfilesInteractive = () => {
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={!pagination.hasNext}
                   className="p-2 rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label="Next page"
                 >
                   <Icon name="ChevronRightIcon" size={20} />
                 </button>
@@ -870,4 +695,4 @@ const FreelancerProfilesInteractive = () => {
   );
 };
 
-export default FreelancerProfilesInteractive;
+export default FreelancerProfilesInteractive;

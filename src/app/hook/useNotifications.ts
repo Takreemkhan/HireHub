@@ -1,6 +1,6 @@
 
-
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useCallback } from "react";
 import { getSocket } from "@/socket/socket";
 
 export interface NotificationMeta {
@@ -32,164 +32,97 @@ interface UseNotificationsReturn {
     notifications: Notification[];
     unreadCount: number;
     loading: boolean;
-    error: string | null;
-    fetchNotifications: () => Promise<void>;
-    markAsRead: (id: string) => Promise<void>;
-    markAllAsRead: () => Promise<void>;
-    deleteNotification: (id: string) => Promise<void>;
+    error: any;
+    fetchNotifications: () => void;
+    markAsRead: (id: string) => void;
+    markAllAsRead: () => void;
+    deleteNotification: (id: string) => void;
 }
 
 export function useNotifications(userId: string | undefined): UseNotificationsReturn {
-    const [notifications, setNotifications] = useState<Notification[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const pollingRef = useRef<NodeJS.Timeout | null>(null);
+    const queryClient = useQueryClient();
 
-    // ── Derived unread count
-    const unreadCount = notifications.filter((n) => !n.isRead).length;
-
-    // ── Fetch all notifications from API
-    const fetchNotifications = useCallback(async () => {
-        if (!userId) return;
-        setLoading(true);
-        setError(null);
-        try {
+    const { data: notifications = [], isLoading: loading, error, refetch } = useQuery<Notification[]>({
+        queryKey: ["notifications", userId],
+        queryFn: async () => {
             const res = await fetch("/api/notifications?limit=30");
             const data = await res.json();
-
-            if (data.success) {
-                if (typeof window !== "undefined") {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const activeChatId = urlParams.get("chatId");
-                    if (activeChatId) {
-                        data.notifications.forEach((n: Notification) => {
-                            if (!n.isRead && n.type === "message" && n.meta?.chatId === activeChatId) {
-                                n.isRead = true;
-                                fetch(`/api/notifications/${n._id}`, { method: "PATCH" }).catch(() => { });
-                            }
-                        });
-                    }
+            if (!data.success) throw new Error(data.error || "Failed to fetch");
+            
+            // Auto-mark as read for active chat if needed (legacy logic)
+            if (typeof window !== "undefined") {
+                const urlParams = new URLSearchParams(window.location.search);
+                const activeChatId = urlParams.get("chatId");
+                if (activeChatId) {
+                    data.notifications.forEach((n: Notification) => {
+                        if (!n._id) return;
+                        if (!n.isRead && n.type === "message" && n.meta?.chatId === activeChatId) {
+                            fetch(`/api/notifications/${n._id}`, { method: "PATCH" }).catch(() => { });
+                        }
+                    });
                 }
-                setNotifications(data.notifications);
-            } else {
-                setError(data.error || "Failed to load notifications");
             }
-        } catch (err) {
-            setError("Network error while loading notifications");
-        } finally {
-            setLoading(false);
-        }
-    }, [userId]);
+            return data.notifications;
+        },
+        enabled: !!userId,
+        staleTime: 30_000, // 30 seconds
+    });
 
-    // ── Mark single notification as read
-    const markAsRead = useCallback(async (id: string) => {
-        // Optimistic update
-        setNotifications((prev) =>
-            prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
-        );
-        try {
+    const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+    const markAsReadMutation = useMutation({
+        mutationFn: async (id: string) => {
             await fetch(`/api/notifications/${id}`, { method: "PATCH" });
-        } catch {
-            // Revert on failure
-            setNotifications((prev) =>
-                prev.map((n) => (n._id === id ? { ...n, isRead: false } : n))
+        },
+        onMutate: async (id) => {
+            await queryClient.cancelQueries({ queryKey: ["notifications", userId] });
+            const previous = queryClient.getQueryData(["notifications", userId]);
+            queryClient.setQueryData(["notifications", userId], (old: Notification[] | undefined) => 
+                old?.map(n => n._id === id ? { ...n, isRead: true } : n)
             );
+            return { previous };
+        },
+        onError: (err, id, context) => {
+            if (context?.previous) queryClient.setQueryData(["notifications", userId], context.previous);
         }
-    }, []);
+    });
 
-    // ── Mark all as read
-    const markAllAsRead = useCallback(async () => {
-        // Optimistic update
-        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-        try {
+    const markAllAsReadMutation = useMutation({
+        mutationFn: async () => {
             await fetch("/api/notifications", { method: "PUT" });
-        } catch {
-            await fetchNotifications(); // Re-sync on failure
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
         }
-    }, [fetchNotifications]);
+    });
 
-    // ── Delete a single notification
-    const deleteNotification = useCallback(async (id: string) => {
-        setNotifications((prev) => prev.filter((n) => n._id !== id));
-        try {
+    const deleteNotificationMutation = useMutation({
+        mutationFn: async (id: string) => {
             await fetch(`/api/notifications/${id}`, { method: "DELETE" });
-        } catch {
-            await fetchNotifications(); // Re-sync on failure
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
         }
-    }, [fetchNotifications]);
+    });
 
-    // ── Listen for custom chat:read event
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-        const handleChatRead = (e: Event) => {
-            const customEvent = e as CustomEvent;
-            const openedChatId = customEvent.detail?.chatId;
-            if (openedChatId) {
-                setNotifications((prev) =>
-                    prev.map((n) =>
-                        (!n.isRead && n.type === "message" && n.meta?.chatId === openedChatId)
-                            ? { ...n, isRead: true }
-                            : n
-                    )
-                );
-            }
-        };
-        window.addEventListener("chat:read", handleChatRead);
-        return () => window.removeEventListener("chat:read", handleChatRead);
-    }, []);
-
-    // ── Socket.IO — listen for real-time new notifications
     useEffect(() => {
         if (!userId) return;
-
-        let socket: ReturnType<typeof getSocket> | null = null;
-
-        try {
-            socket = getSocket();
-
-            const handleNewNotification = (notification: Notification) => {
-                if (typeof window !== "undefined") {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const activeChatId = urlParams.get("chatId");
-                    if (notification.type === "message" && notification.meta?.chatId === activeChatId) {
-                        // Immediately mark as read and don't count it as unread
-                        fetch(`/api/notifications/${notification._id}`, { method: "PATCH" }).catch(() => { });
-                        setNotifications((prev) => [{ ...notification, isRead: true }, ...prev]);
-                        return;
-                    }
-                }
-                setNotifications((prev) => [notification, ...prev]);
-            };
-
-            socket.on("notification:new", handleNewNotification);
-
-            return () => {
-                socket?.off("notification:new", handleNewNotification);
-            };
-        } catch (err) {
-            console.warn("Socket not available for notifications, using polling.");
-        }
-    }, [userId]);
-
-    // ── Polling fallback — refresh every 30 seconds
-    useEffect(() => {
-        if (!userId) return;
-        fetchNotifications();
-
-        pollingRef.current = setInterval(fetchNotifications, 30_000);
-        return () => {
-            if (pollingRef.current) clearInterval(pollingRef.current);
+        const socket = getSocket();
+        const handleNewNotification = () => {
+            queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
         };
-    }, [fetchNotifications, userId]);
+        socket.on("notification:new", handleNewNotification);
+        return () => { socket.off("notification:new", handleNewNotification); };
+    }, [userId, queryClient]);
 
     return {
         notifications,
         unreadCount,
         loading,
         error,
-        fetchNotifications,
-        markAsRead,
-        markAllAsRead,
-        deleteNotification,
+        fetchNotifications: () => refetch(),
+        markAsRead: (id) => markAsReadMutation.mutate(id),
+        markAllAsRead: () => markAllAsReadMutation.mutate(),
+        deleteNotification: (id) => deleteNotificationMutation.mutate(id),
     };
 }

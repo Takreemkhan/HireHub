@@ -94,14 +94,15 @@ export const getClientProfileDetails = async (userId: string) => {
   return res.json();
 };
 
-export const getCurrentJobs = async () => {
-  const res = await fetch("/api/client/jobs/current", {
+export const getCurrentJobs = async (businessId?: string) => {
+  const url = businessId ? `/api/client/jobs/current?businessId=${businessId}` : "/api/client/jobs/current";
+  const res = await fetch(url, {
     method: "GET",
     credentials: "include",
   });
 
   if (!res.ok) {
-    throw new Error("Failed to fetch categories");
+    throw new Error("Failed to fetch current jobs");
   }
 
   return res.json();
@@ -182,15 +183,32 @@ export const getFreelancerActivity = async () => {
 }
 
 
-// Freelancer activity 
-export const getAllFreelancerProfiles = async () => {
-  const res = await fetch("/api/freelancer/profile?limit=500", {
+// All Freelancer Profiles with pagination and search
+export const getAllFreelancerProfiles = async (params: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  skills?: string[];
+  minRate?: number;
+  maxRate?: number;
+  location?: string;
+} = {}) => {
+  const query = new URLSearchParams();
+  if (params.page) query.append("page", params.page.toString());
+  if (params.limit) query.append("limit", params.limit.toString());
+  if (params.search) query.append("search", params.search);
+  if (params.skills && params.skills.length > 0) query.append("skills", params.skills.join(","));
+  if (params.minRate) query.append("minRate", params.minRate.toString());
+  if (params.maxRate) query.append("maxRate", params.maxRate.toString());
+  if (params.location) query.append("location", params.location);
+
+  const res = await fetch(`/api/freelancer/profile?${query.toString()}`, {
     method: "GET",
     credentials: "include",
   });
 
   if (!res.ok) {
-    throw new Error("Failed to fetch freelancer activity");
+    throw new Error("Failed to fetch profiles");
   }
 
   return res.json();
@@ -296,9 +314,9 @@ export const getProposals = async ({
   return res.json();
 };
 
-// get client drafts
-export const getClientDrafts = async () => {
-  const res = await fetch("/api/jobs/drafts", {
+export const getClientDrafts = async (businessId?: string) => {
+  const url = businessId ? `/api/jobs/drafts?businessId=${businessId}` : "/api/jobs/drafts";
+  const res = await fetch(url, {
     method: "GET",
     credentials: "include",
   });
@@ -310,8 +328,12 @@ export const getClientDrafts = async () => {
   return res.json();
 }
 
-export const getClientCompletedJobs = async (page = 1, limit = 10) => {
-  const res = await fetch(`/api/client/jobs/completed?page=${page}&limit=${limit}`, {
+export const getClientCompletedJobs = async (page = 1, limit = 10, businessId?: string) => {
+  let url = `/api/client/jobs/completed?page=${page}&limit=${limit}`;
+  if (businessId) {
+    url += `&businessId=${businessId}`;
+  }
+  const res = await fetch(url, {
     method: "GET",
     credentials: "include",
   });

@@ -14,7 +14,7 @@ const toObjectId = (id) => {
 };
 
 /* POST A JOB (WITH PAYMENT CHECK) */
-export const postJob = async (clientId, jobData) => {
+export const postJob = async (clientId, jobData, businessPageId = null) => {
   const client = await clientPromise;
   const db = client.db(DB_NAME);
 
@@ -65,6 +65,9 @@ export const postJob = async (clientId, jobData) => {
     proposalCount: 0,
     status: "open",
     isDraft: false,
+    // Business page support — if job is posted via a business page,
+    // store businessPageId so the dashboard can filter by it
+    ...(businessPageId ? { businessPageId: toObjectId(businessPageId) } : {}),
     createdAt: new Date(),
     updatedAt: new Date()
   };
