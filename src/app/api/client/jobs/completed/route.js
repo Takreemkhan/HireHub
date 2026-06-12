@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { getClientCompletedJobs, markJobAsCompleted } from "@/app/controllers/client-jobs.controller";
 import { verifyAuth, unauthorizedResponse } from "@/lib/auth.middleware";
+import { getOrSetCache, invalidateCache, redis } from "@/lib/redis";
 
-/* GET - Get client's completed jobs
- */
+/* GET - Get client's completed jobs */
 export async function GET(req) {
   try {
     const auth = await verifyAuth(req);
@@ -16,7 +16,15 @@ export async function GET(req) {
     const limit = parseInt(searchParams.get("limit")) || 10;
     const businessId = searchParams.get("businessId") || null;
 
-    const result = await getClientCompletedJobs(auth.userId, page, limit, businessId);
+    const cacheKey = `api:client:jobs:completed:${auth.userId}:${page}:${limit}:${businessId || 'none'}`;
+
+    const result = await getOrSetCache(
+      cacheKey,
+      async () => {
+        return await getClientCompletedJobs(auth.userId, page, limit, businessId);
+      },
+      300 // Cache for 5 minutes
+    );
 
     return NextResponse.json(
       {
@@ -78,6 +86,17 @@ export async function POST(req) {
       auth.userId,
       { finalAmount, notes, clientReview }
     );
+
+    // Invalidate client's completed jobs cache, current jobs cache, and general job cache
+    if (redis) {
+      const keysCurrent = await redis.keys(`api:client:jobs:current:${auth.userId}:*`);
+      const keysCompleted = await redis.keys(`api:client:jobs:completed:${auth.userId}:*`);
+      const keysToDel = [...keysCurrent, ...keysCompleted];
+      if (keysToDel.length > 0) {
+        await redis.del(...keysToDel);
+      }
+    }
+    await invalidateCache([`api:jobs:${jobId}`, 'api:jobs:all']);
 
     return NextResponse.json(
       {

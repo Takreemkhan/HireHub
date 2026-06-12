@@ -10,7 +10,7 @@ import PortfolioUpload from "./components/PortfolioUpload";
 
 import { MapPin, Star } from "lucide-react";
 import { useProfileDetails } from "@/app/hook/useProfile";
-import Link from "next/link";
+
 
 export default function FreelancerDetailPage({
   params,
@@ -144,7 +144,7 @@ export default function FreelancerDetailPage({
     name, location, image, skills,
     title, totalEarned, rating, reviews, role, workExperience, email, activeProjects, profileImage,
     profileCompleteness, portfolio, occupationTime, memberSince, languages, hourlyRate, experience, education,
-    coverPhoto, contact, completedJobs, certifications, about, totalHours,
+    coverPhoto, completedJobs, certifications, about, totalHours,
     completedJobsList, activeJobsList
   } = data?.profile || {};
 
@@ -330,107 +330,7 @@ export default function FreelancerDetailPage({
                 <p className="text-sm text-gray-600">{occupationTime ?? "—"}</p>
               </section>
 
-              {/* LINKED ACCOUNTS SECTION */}
-              <section className="flex flex-col gap-4 border-t pt-8">
 
-                {/* Email */}
-                {contact?.email && contact.email.trim() !== "" && (
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-2">
-                      <div className="bg-black text-white p-1 rounded text-[10px] font-bold">
-                        Email
-                      </div>
-
-                      <div>
-                        <p className="text-blue-500 text-xs font-bold mt-1 cursor-pointer hover:underline flex items-center gap-1">
-                          🔗 {contact.email}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Phone */}
-                {contact?.phone && contact.phone.trim() !== "" && (
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-2">
-                      <div className="bg-black text-white p-1 rounded text-[10px] font-bold">
-                        Phone
-                      </div>
-
-                      <div>
-                        <p className="text-blue-500 text-xs font-bold mt-1 flex items-center gap-1">
-                          📞 {contact.phone}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Website */}
-                {contact?.website && contact.website.trim() !== "" && (
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-2">
-                      <div className="bg-black text-white p-1 rounded text-[10px] font-bold">
-                        Website
-                      </div>
-
-                      <div>
-                        <Link
-                          href={contact.website}
-                          target="_blank"
-                          className="text-blue-500 text-xs font-bold hover:underline flex items-center gap-1"
-                        >
-                          🌐 {contact.website}
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* LinkedIn */}
-                {contact?.linkedin && contact.linkedin.trim() !== "" && (
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-2">
-                      <div className="bg-black text-white p-1 rounded text-[10px] font-bold">
-                        LinkedIn
-                      </div>
-
-                      <div>
-                        <Link
-                          href={contact.linkedin}
-                          target="_blank"
-                          className="text-blue-500 text-xs font-bold hover:underline flex items-center gap-1"
-                        >
-                          💼 {contact.linkedin}
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Github */}
-                {contact?.github && contact.github.trim() !== "" && (
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-2">
-                      <div className="bg-black text-white p-1 rounded text-[10px] font-bold">
-                        Github
-                      </div>
-
-                      <div>
-                        <Link
-                          href={contact.github}
-                          target="_blank"
-                          className="text-blue-500 text-xs font-bold hover:underline flex items-center gap-1"
-                        >
-                          🐙 {contact.github}
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-              </section>
             </aside>
 
             {/* CONTENT AREA */}

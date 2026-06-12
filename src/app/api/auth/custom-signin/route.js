@@ -88,11 +88,20 @@ export async function POST(req) {
     // For now, returning user data
     const { password: _, ...userWithoutPassword } = user;
 
+    // Generate JWT token for mobile and custom API clients
+    const jwt = require("jsonwebtoken");
+    const token = jwt.sign(
+      { userId: user._id, email: user.email, role: user.role || "freelancer" },
+      process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || "hirehub_default_secret_key_2024",
+      { expiresIn: "30d" }
+    );
+
     return NextResponse.json(
       {
         success: true,
         message: "Login successful",
-        user: userWithoutPassword
+        user: userWithoutPassword,
+        token: token
       },
       { status: 200 }
     );

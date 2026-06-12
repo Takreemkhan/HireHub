@@ -95,10 +95,11 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import CompletedJobCard from './CompletedJobCard';
 import { Briefcase } from 'lucide-react';
+import { useCompletedJobs } from '@/app/hook/useProfile';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -130,6 +131,7 @@ function formatDuration(days?: number): string {
   return `${weeks} week${weeks !== 1 ? 's' : ''}`;
 }
 
+// Format Price helper
 function formatPrice(amount?: number): string {
   if (!amount) return 'Not specified';
   return `£${amount.toLocaleString()}`;
@@ -157,50 +159,10 @@ export default function CompletedJobsSection() {
   const params = useParams();
   const businessId = params?.businessId as string | undefined;
 
-  const [jobs, setJobs] = useState<CompletedJob[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [activeJob, setActiveJob] = useState<CompletedJob | null>(null);
 
-  useEffect(() => {
-    const fetchCompletedJobs = async () => {
-      try {
-        setLoading(true);
-        setError('');
-
-        console.log('📥 Fetching completed jobs from GET /api/client/jobs/completed...');
-
-        // ✅ NEW ENDPOINT - Returns only completed jobs for current user
-        const fetchUrl = businessId ? `/api/client/jobs/completed?businessId=${businessId}` : '/api/client/jobs/completed';
-        const res = await fetch(fetchUrl);
-        const data = await res.json();
-
-        console.log('📦 Response:', data);
-
-        // ✅ Check success field
-        if (!res.ok || !data.success) {
-          if (res.status === 401) {
-            router.push('/sign-in-page');
-            return;
-          }
-          throw new Error(data.message || 'Failed to load completed jobs');
-        }
-
-        const completedJobs = data.jobs || [];
-        console.log(`✅ Completed jobs: ${completedJobs.length}`);
-
-        setJobs(completedJobs);
-
-      } catch (err: any) {
-        console.error('❌ CompletedJobsSection fetch error:', err);
-        setError(err.message || 'Failed to load completed jobs');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCompletedJobs();
-  }, [router]);
+  const { data, isLoading: loading, error, refetch } = useCompletedJobs(1, 100, businessId);
+  const jobs = data?.jobs || [];
 
   const handleViewFullJob = () => {
     if (!activeJob) return;
@@ -228,9 +190,9 @@ export default function CompletedJobsSection() {
         <div className="text-center py-16">
           <div className="text-4xl mb-4">⚠️</div>
           <p className="text-gray-700 font-medium mb-2">Failed to load completed jobs</p>
-          <p className="text-sm text-gray-500 mb-6">{error}</p>
+          <p className="text-sm text-gray-500 mb-6">{(error as any)?.message || 'Something went wrong'}</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => refetch()}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
           >
             Try Again
@@ -268,22 +230,16 @@ export default function CompletedJobsSection() {
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {jobs.map((job) => (
-            <div
-              key={job._id}
-              role="button"
-              tabIndex={0}
-              onClick={() => setActiveJob(job)}
-              onKeyDown={(e) => e.key === 'Enter' && setActiveJob(job)}
-              className="cursor-pointer"
-            >
+          {jobs.map((job: any) => (
               <CompletedJobCard
+                key={job._id}
                 title={job.title}
                 rating={job.clientReview?.rating || 0}
                 duration={formatDuration(job.durationInDays)}
                 price={formatPrice(job.finalAmount || job.budget)}
+                completedAt={job.completedAt}
+                onClick={() => setActiveJob(job)}
               />
-            </div>
           ))}
         </div>
       </div>

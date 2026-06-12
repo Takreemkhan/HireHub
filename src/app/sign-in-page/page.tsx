@@ -85,10 +85,17 @@ function SigninPageContent() {
     }
   }, []);
 
-  // Check if redirected here due to block
+  // Check if redirected here due to block or auth errors
   useEffect(() => {
-    if (searchParams.get("error") === "blocked") {
+    const err = searchParams.get("error");
+    if (err === "blocked") {
       setLoginError("🚫 Your account has been blocked by the admin. Please contact support.");
+    } else if (err === "OAuthCallback") {
+      setLoginError("❌ Google sign-in failed. Please try again or make sure your credentials are correct.");
+    } else if (err === "OAuthAccountNotLinked") {
+      setLoginError("⚠️ This email is already registered with another login method. Please sign in with your email and password.");
+    } else if (err) {
+      setLoginError(`❌ Authentication failed: ${err}`);
     }
   }, [searchParams]);
 
@@ -152,7 +159,7 @@ function SigninPageContent() {
 
     try {
       // ✅ Pehle block check karo
-      const checkRes = await fetch("/api/auth/signin", {
+      const checkRes = await fetch("/api/auth/custom-signin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),

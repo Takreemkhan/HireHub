@@ -2,12 +2,9 @@ import { NextResponse } from "next/server";
 import {
   saveDraftJob,
   getClientDrafts,
-  getDraftById,
-  updateDraft,
-  deleteDraft,
-  publishDraft
 } from "@/app/controllers/draft-job.controller";
 import { verifyAuth, unauthorizedResponse } from "@/lib/auth.middleware";
+import { getOrSetCache, invalidateCache, redis } from "@/lib/redis";
 
 /**
  * POST - Save job as draft
@@ -31,7 +28,8 @@ export async function POST(req) {
       budget,
       jobVisibility,
       freelancerSource,
-      projectDuration
+      projectDuration,
+      businessPageId
     } = body;
 
     // For draft, only title is required minimum
@@ -59,10 +57,19 @@ export async function POST(req) {
       freelancerSource: freelancerSource || null,
       projectDuration: projectDuration || null,
       jobVisibility: jobVisibility || "public",
+      businessPageId: businessPageId ? businessPageId : null,
       isDraft: true,
       status: "draft",
       proposalCount: 0
     });
+
+    // Invalidate client drafts cache
+    if (redis) {
+      const keys = await redis.keys(`api:client:drafts:${auth.userId}:*`);
+      if (keys.length > 0) {
+        await redis.del(...keys);
+      }
+    }
 
     return NextResponse.json(
       {
@@ -101,13 +108,22 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const businessId = searchParams.get("businessId") || null;
 
-    const drafts = await getClientDrafts(auth.userId, businessId);
+    const cacheKey = `api:client:drafts:${auth.userId}:${businessId || 'none'}`;
+
+    const result = await getOrSetCache(
+      cacheKey,
+      async () => {
+        const drafts = await getClientDrafts(auth.userId, businessId);
+        return { drafts };
+      },
+      300 // 5 minutes
+    );
 
     return NextResponse.json(
       {
         success: true,
-        drafts,
-        total: drafts.length
+        ...result,
+        total: result.drafts.length
       },
       { status: 200 }
     );

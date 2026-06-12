@@ -20,6 +20,7 @@ import MembershipConnects from "./components/SettingsSection/MembershipConnects"
 import Transactions from "./components/SettingsSection/Transactions";
 import Withdrawals from "./components/SettingsSection/Withdrawals";
 import { useProfileDetails } from "../hook/useProfile";
+import { useFreelancerMembershipStatus, useFreelancerPlans } from "@/hooks/queries/useFreelancerDashboard";
 import { useSession } from "next-auth/react";
 import CardSkeleton from "@/components/Loader/Loader";
 const getInitials = (name: string) => {
@@ -62,22 +63,37 @@ function FreelancerDashboardInner({ id }: { id: string }) {
   const isLoading = sessionStatus === "loading" || sessionStatus === "unauthenticated" || profileLoading;
   const freelancer = responseData?.profile || {};
 
+  // React Query Hooks
+  const { data: membershipData } = useFreelancerMembershipStatus();
+  const { data: plansData } = useFreelancerPlans();
+
   const name = freelancer.name || session?.user?.name || "user";
   const [sidebarImage, setSidebarImage] = useState<string | null>(null);
   const userImage = sidebarImage || freelancer.profileImage || freelancer.image || session?.user?.image || freelancer.profilePic;
   const [pendingInvitations, setPendingInvitations] = useState(4);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  // Subscription plan state (Basic or Plus)
-  const [planInfo, setPlanInfo] = useState<{
-    planKey: string; planLabel: string; billingCycle: string | null;
-    planExpiry: string | null; isPlus: boolean;
-  }>({ planKey: 'basic', planLabel: 'Basic', billingCycle: null, planExpiry: null, isPlus: false });
+  // Derive bits status and plan info from React Query state
+  const bidsRemaining = plansData?.subscription?.bidsRemaining ?? membershipData?.bidsRemaining ?? null;
+  const bidsTotal = plansData?.subscription?.bidsTotal ?? membershipData?.bidsTotal ?? null;
 
-  // Bids state
-  const [bidsRemaining, setBidsRemaining] = useState<number | null>(null);
-  const [bidsTotal, setBidsTotal] = useState<number | null>(null);
+  const sub = plansData?.subscription;
+  const now = new Date();
+  const isPlus = sub?.planKey === 'plus' && sub?.isPlanActive &&
+    sub?.planExpiry && new Date(sub.planExpiry) > now;
 
+  const planInfo = {
+    planKey: isPlus ? 'plus' : 'basic',
+    planLabel: isPlus ? 'Plus' : 'Basic',
+    billingCycle: sub?.billingCycle ?? null,
+    planExpiry: sub?.planExpiry ?? null,
+    isPlus: !!isPlus,
+  };
+
+  useEffect(() => {
+    if (bidsRemaining !== null) localStorage.setItem('freelancerBitsRemaining', String(bidsRemaining));
+    if (bidsTotal !== null) localStorage.setItem('freelancerBitsTotal', String(bidsTotal));
+  }, [bidsRemaining, bidsTotal]);
 
   const activeSection = searchParams.get('view') || 'overview';
 
@@ -145,48 +161,6 @@ function FreelancerDashboardInner({ id }: { id: string }) {
       default: return <OverviewSection />;
     }
   };
-  // Fetch bids balance + video plan on mount
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Bids
-        const storedRemaining = localStorage.getItem('freelancerBitsRemaining');
-        const storedTotal = localStorage.getItem('freelancerBitsTotal');
-        if (storedRemaining !== null) setBidsRemaining(Number(storedRemaining));
-        if (storedTotal !== null) setBidsTotal(Number(storedTotal));
-
-        const [bidsRes, plansRes] = await Promise.all([
-          fetch('/api/freelancer/membership/status', { credentials: 'include' }),
-          fetch('/api/freelancer/plans', { credentials: 'include' }),
-        ]);
-        const bidsData = await bidsRes.json();
-        if (bidsData.success) {
-          setBidsRemaining(bidsData.bidsRemaining ?? bidsData.subscription?.bitsRemaining ?? 0);
-          setBidsTotal(bidsData.bidsTotal ?? bidsData.subscription?.bitsTotal ?? 0);
-        }
-        const plansData = await plansRes.json();
-        if (plansData.success) {
-          const sub = plansData.subscription;
-          const now = new Date();
-          const isPlus = sub?.planKey === 'plus' && sub?.isPlanActive &&
-            sub?.planExpiry && new Date(sub.planExpiry) > now;
-          setPlanInfo({
-            planKey: isPlus ? 'plus' : 'basic',
-            planLabel: isPlus ? 'Plus' : 'Basic',
-            billingCycle: sub?.billingCycle ?? null,
-            planExpiry: sub?.planExpiry ?? null,
-            isPlus: !!isPlus,
-          });
-          // Sync bids from plans API too
-          if (sub?.bidsRemaining != null) setBidsRemaining(sub.bidsRemaining);
-          if (sub?.bidsTotal != null) setBidsTotal(sub.bidsTotal);
-        }
-      } catch (e) {
-        console.error('Dashboard data fetch error:', e);
-      }
-    };
-    fetchData();
-  }, []);
 
 
   if (isLoading) return (

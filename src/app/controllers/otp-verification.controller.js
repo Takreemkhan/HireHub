@@ -6,7 +6,7 @@ import nodemailer from "nodemailer";
 
 
 // Generate 6-digit OTP 
-const generateOTP = () => {
+export const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
@@ -86,6 +86,87 @@ export const sendOTPEmail = async (email, otp) => {
           <div class="content">
             <h2>Verify Your Email</h2>
             <p>Thank you for signing up! Please use the following OTP to verify your email address:</p>
+            <div class="otp">${otp}</div>
+            <p>This OTP will expire in <strong>10 minutes</strong>.</p>
+            <p>If you didn't request this, please ignore this email.</p>
+          </div>
+          <div class="footer">
+            <p>&copy; 2026 FreelanceHub. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  await transporter.sendMail(mailOptions);
+};
+
+/* SEND FORGOT PASSWORD OTP EMAIL */
+export const sendForgotPasswordOTPEmail = async (email, otp) => {
+  const transporter = createTransporter();
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: 'Reset Password - FreelanceHub',
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+          }
+          .container {
+            max-width: 600px;
+            margin: 50px auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+          }
+          .header {
+            background-color: #ff6b35;
+            color: white;
+            padding: 30px;
+            text-align: center;
+          }
+          .content {
+            padding: 40px 30px;
+            text-align: center;
+          }
+          .otp {
+            font-size: 36px;
+            font-weight: bold;
+            color: #ff6b35;
+            letter-spacing: 5px;
+            margin: 30px 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            display: inline-block;
+          }
+          .footer {
+            background-color: #f9f9f9;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>FreelanceHub</h1>
+          </div>
+          <div class="content">
+            <h2>Reset Your Password</h2>
+            <p>You requested a password reset. Please use the following OTP code to verify your identity and reset your password:</p>
             <div class="otp">${otp}</div>
             <p>This OTP will expire in <strong>10 minutes</strong>.</p>
             <p>If you didn't request this, please ignore this email.</p>

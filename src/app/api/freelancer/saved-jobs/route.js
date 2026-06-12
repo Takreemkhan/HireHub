@@ -7,20 +7,22 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import clientPromise, { DB_NAME, COLLECTIONS } from "@/lib/mongodb";
+import { verifyAuth } from "@/lib/auth.middleware";
 import { ObjectId } from "mongodb";
 
 // ── GET ────────────────────────────────────────────────────────────────────────
 export async function GET(req) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user?.id) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const auth = await verifyAuth(req);
+        if (!auth.authenticated) {
+            return NextResponse.json({ error: auth.error || "Unauthorized" }, { status: 401 });
         }
+        const userId = auth.userId;
 
         const client = await clientPromise;
         const db = client.db(DB_NAME);
 
-        const freelancerId = new ObjectId(session.user.id);
+        const freelancerId = new ObjectId(userId);
 
         // Saved job IDs for this freelancer
         const savedDocs = await db
@@ -101,10 +103,11 @@ export async function GET(req) {
 // ── POST (toggle) ──────────────────────────────────────────────────────────────
 export async function POST(req) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user?.id) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const auth = await verifyAuth(req);
+        if (!auth.authenticated) {
+            return NextResponse.json({ error: auth.error || "Unauthorized" }, { status: 401 });
         }
+        const userId = auth.userId;
 
         const { jobId } = await req.json();
         if (!jobId || !ObjectId.isValid(jobId)) {
@@ -115,7 +118,7 @@ export async function POST(req) {
         const db = client.db(DB_NAME);
         const col = db.collection(COLLECTIONS.SAVED_JOBS);
 
-        const freelancerId = new ObjectId(session.user.id);
+        const freelancerId = new ObjectId(userId);
         const jobObjId = new ObjectId(jobId);
 
         const existing = await col.findOne({ freelancerId, jobId: jobObjId });

@@ -495,66 +495,13 @@
 //       <div className="bg-gray-50">
 //         <div className="max-w-7xl mx-auto px-4 py-8">
 //           <div className="text-center py-16">
-//             <Briefcase className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-//             <h3 className="text-xl font-semibold text-gray-700 mb-2">
-//               No jobs posted yet
-//             </h3>
-//             <p className="text-gray-500 mb-6">
-//               Post your first job to start receiving proposals from freelancers.
-//             </p>
-//             <button
-//               onClick={() => router.push('/post-page')}
-//               className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-//             >
-//               <Plus className="w-4 h-4" />
-//               Post a Job
-//             </button>
-//           </div>
-//         </div>
-//       </div>
-//     );
-//   }
-
-//   // ── Real jobs grid ───────────────────────────────────────────────────────
-//   return (
-//     <div className="bg-gray-50">
-//       <div className="max-w-7xl mx-auto px-4 py-8">
-
-//         {/* Header with count */}
-//         <div className="flex items-center justify-between mb-6">
-//           <p className="text-sm text-gray-500">
-//             {jobs.length} job{jobs.length !== 1 ? 's' : ''} posted
-//           </p>
-//           <button
-//             onClick={() => router.push('/post-page')}
-//             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-//           >
-//             <Plus className="w-4 h-4" />
-//             Post Another Job
-//           </button>
-//         </div>
-
-//         {/* Job cards — clicking navigates to /client-dashboard/current-jobs/[real _id] */}
-//         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-//           {jobs.map((job) => (
-//             <JobCard
-//               key={job._id}
-//               job={job}
-//               onClick={() => router.push(`/client-dashboard/current-jobs/${job._id}`)}
-//             />
-//           ))}
-//         </div>
-
-//       </div>
-//     </div>
-//   );
-// }
+//             <Briefcase className="w-16.h-16 text-gray-300" />
 
 'use client';
 
 import { useRouter, useParams } from 'next/navigation';
 import { Clock, MapPin, Tag, Briefcase, Plus, Banknote } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useClientCurrentJobs } from '@/hooks/queries/useClientJobs';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -587,11 +534,17 @@ function timeAgo(dateString: string): string {
   const mins = Math.floor(diffMs / 60000);
   const hours = Math.floor(mins / 60);
   const days = Math.floor(hours / 24);
-  if (mins < 60) return `${mins} minutes ago`;
-  if (hours < 24) return `${hours} hours ago`;
-  if (days === 1) return '1 day ago';
-  if (days < 7) return `${days} days ago`;
-  return `${Math.floor(days / 7)} weeks ago`;
+  const weeks = Math.floor(days / 7);
+  const months = Math.floor(days / 30);
+  const years = Math.floor(days / 365);
+
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} minute${mins !== 1 ? 's' : ''} ago`;
+  if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+  if (days < 7) return `${days} day${days !== 1 ? 's' : ''} ago`;
+  if (weeks < 4) return `${weeks} week${weeks !== 1 ? 's' : ''} ago`;
+  if (months < 12) return `${months} month${months !== 1 ? 's' : ''} ago`;
+  return `${years} year${years !== 1 ? 's' : ''} ago`;
 }
 
 // NAYA - ye lagao
@@ -732,6 +685,8 @@ function JobCardSkeleton() {
   );
 }
 
+
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function CurrentJobsSection() {
@@ -739,59 +694,16 @@ export default function CurrentJobsSection() {
   const params = useParams();
   const businessId = params?.businessId as string | undefined;
 
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [stats, setStats] = useState({
+  // Use React Query to manage fetching, loading, error and stats
+  const { data: currentJobsData, isLoading: loading, error: queryError } = useClientCurrentJobs({ businessId });
+
+  const jobs = currentJobsData?.jobs || [];
+  const error = queryError ? (queryError as Error).message : '';
+  const stats = currentJobsData?.stats || {
     totalCurrent: 0,
     inProgressCount: 0,
     openCount: 0,
-  });
-
-  useEffect(() => {
-    const fetchCurrentJobs = async () => {
-      try {
-        setLoading(true);
-        setError('');
-
-        console.log('📥 Fetching current jobs from GET /api/client/jobs/current...');
-
-        // ✅ NEW ENDPOINT - Returns only current user's jobs (open + in-progress)
-        const fetchUrl = businessId ? `/api/client/jobs/current?businessId=${businessId}` : '/api/client/jobs/current';
-        const res = await fetch(fetchUrl);
-        const data = await res.json();
-
-        console.log('📦 Response:', data);
-
-        // ✅ Check success field
-        if (!res.ok || !data.success) {
-          if (res.status === 401) {
-            router.push('/sign-in-page');
-            return;
-          }
-          throw new Error(data.message || 'Failed to load current jobs');
-        }
-
-        const currentJobs = data.jobs || [];
-        console.log(`✅ Current jobs: ${currentJobs.length}`);
-
-        setJobs(currentJobs);
-
-        // Set stats if provided
-        if (data.stats) {
-          setStats(data.stats);
-        }
-
-      } catch (err: any) {
-        console.error('❌ CurrentJobsSection fetch error:', err);
-        setError(err.message || 'Failed to load your current jobs');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCurrentJobs();
-  }, [router]);
+  };
 
   // ── Loading skeletons ────────────────────────────────────────────────────
   if (loading) {
@@ -879,7 +791,7 @@ export default function CurrentJobsSection() {
 
         {/* Job cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {jobs.map((job) => (
+          {jobs.map((job: Job) => (
             <JobCard
               key={job._id}
               job={job}

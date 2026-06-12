@@ -6,6 +6,7 @@ import {
   publishDraft
 } from "@/app/controllers/draft-job.controller";
 import { verifyAuth, unauthorizedResponse } from "@/lib/auth.middleware";
+import { redis } from "@/lib/redis";
 
 /* GET - Get single draft by ID */
 export async function GET(req, { params }) {
@@ -98,6 +99,14 @@ export async function PUT(req, { params }) {
       jobVisibility: jobVisibility || "public"
     });
 
+    // Invalidate client drafts cache
+    if (redis) {
+      const keys = await redis.keys(`api:client:drafts:${auth.userId}:*`);
+      if (keys.length > 0) {
+        await redis.del(...keys);
+      }
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -152,6 +161,14 @@ export async function DELETE(req, { params }) {
         },
         { status: 500 }
       );
+    }
+
+    // Invalidate client drafts cache
+    if (redis) {
+      const keys = await redis.keys(`api:client:drafts:${auth.userId}:*`);
+      if (keys.length > 0) {
+        await redis.del(...keys);
+      }
     }
 
     return NextResponse.json(
@@ -209,6 +226,14 @@ export async function PATCH(req, { params }) {
     }
 
     const publishedJob = await publishDraft(draftId, auth.userId);
+
+    // Invalidate client drafts cache
+    if (redis) {
+      const keys = await redis.keys(`api:client:drafts:${auth.userId}:*`);
+      if (keys.length > 0) {
+        await redis.del(...keys);
+      }
+    }
 
     return NextResponse.json(
       {

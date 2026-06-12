@@ -80,7 +80,7 @@ function FreelancerPlansMain() {
           );
           
           // Deduplicate in case the DB has multiple copies
-          const uniquePlans = Array.from(new Map(filtered.map(p => [p.planKey, p])).values()) as Plan[];
+          const uniquePlans = Array.from(new Map(filtered.map((p: any) => [p.planKey, p])).values()) as Plan[];
           
           setPlans(uniquePlans);
           setSubscription(plansData.subscription);

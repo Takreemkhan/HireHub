@@ -4,6 +4,7 @@ import crypto from "crypto";
 import clientPromise, { DB_NAME, COLLECTIONS } from "@/lib/mongodb";
 import { verifyAuth, unauthorizedResponse } from "@/lib/auth.middleware";
 import { ObjectId } from "mongodb";
+import { invalidateCache } from "@/lib/redis";
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
@@ -264,6 +265,9 @@ export async function PUT(req) {
             purchasedAt: now,
             planExpiry,
         });
+
+        // Invalidate freelancer membership status cache
+        await invalidateCache(`api:freelancer:membership:status:${auth.userId}`);
 
         return NextResponse.json(
             {

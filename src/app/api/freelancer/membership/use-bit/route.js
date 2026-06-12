@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import clientPromise, { DB_NAME } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { verifyAuth, unauthorizedResponse } from "@/lib/auth.middleware";
+import { invalidateCache } from "@/lib/redis";
 
 /**
  * POST /api/freelancer/membership/use-bit
@@ -82,6 +83,9 @@ export async function POST(req) {
       bidsSpent: 1,
       createdAt: now,
     });
+
+    // Invalidate freelancer membership status cache
+    await invalidateCache(`api:freelancer:membership:status:${auth.userId}`);
 
     return NextResponse.json({
       success: true,

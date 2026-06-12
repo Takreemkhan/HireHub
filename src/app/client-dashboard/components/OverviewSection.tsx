@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { usegetAllFreelancerProfiles, useGetClientDrafts, useCompletedJobs } from "@/app/hook/useProfile";
+import { useClientMembershipStatus } from "@/hooks/queries/useClientDashboard";
 import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
@@ -14,46 +15,25 @@ export default function OverviewSection() {
   const { data: freelancerProfiles, isLoading, error } = usegetAllFreelancerProfiles();
   const { data: drafts, isLoading: draftsLoading, error: draftsError } = useGetClientDrafts();
   const { data: completedJobsData } = useCompletedJobs(1, 1);
+  const { data: membershipData } = useClientMembershipStatus();
+
   const userName = session?.user?.name?.split(' ')[0] || "User";
   const freelancerProfilesData = freelancerProfiles?.profiles?.slice(0, 4) || [];
   const lastCompletedJob = completedJobsData?.jobs?.[0];
 
-  // ── Bits widget (mirrors freelancer Bids widget 1-to-1) ──────────────────
-  const [bitsRemaining, setBitsRemaining] = useState<number | null>(null);
-  const [bitsTotal, setBitsTotal] = useState<number | null>(null);
-  const [planLabel, setPlanLabel] = useState<string>('Free');
-const draftsData = drafts?.drafts?.slice(0, 1) || [];
+  // ── Bits widget status (mirrors freelancer Bids widget 1-to-1) ──────────
+  const bitsRemaining = membershipData?.bitsRemaining ?? null;
+  const bitsTotal = membershipData?.bitsTotal ?? null;
+  const planLabel = membershipData?.planLabel ?? 'Free';
+  const draftsData = drafts?.drafts?.slice(0, 1) || [];
+
   useEffect(() => {
-    const fetchMembershipStatus = async () => {
-      try {
-        const storedRemaining = localStorage.getItem('clientBitsRemaining');
-        const storedTotal = localStorage.getItem('clientBitsTotal');
-        const storedPlan = localStorage.getItem('clientMembershipPlan');
-
-        if (storedRemaining !== null) setBitsRemaining(Number(storedRemaining));
-        if (storedTotal !== null) setBitsTotal(Number(storedTotal));
-        if (storedPlan) setPlanLabel(storedPlan);
-
-        const res = await fetch('/api/client/membership/status');
-        const data = await res.json();
-        console.log("client memvership status", data)
-        if (data.success) {
-          setBitsRemaining(data.subscription.bitsRemaining);
-          setBitsTotal(data.subscription.bitsTotal);
-          setPlanLabel(data.subscription.planLabel);
-
-
-          localStorage.setItem('clientBitsRemaining', String(data.subscription.bitsRemaining));
-          localStorage.setItem('clientBitsTotal', String(data.subscription.bitsTotal));
-          localStorage.setItem('clientMembershipPlan', data.subscription.planLabel);
-        }
-      } catch (error) {
-        console.log('Error fetching membership status:', error);
-      }
-    };
-
-    fetchMembershipStatus();
-  }, []);
+    if (membershipData) {
+      localStorage.setItem('clientBitsRemaining', String(membershipData.bitsRemaining));
+      localStorage.setItem('clientBitsTotal', String(membershipData.bitsTotal));
+      localStorage.setItem('clientMembershipPlan', membershipData.planLabel);
+    }
+  }, [membershipData]);
   // ─────────────────────────────────────────────────────────────────────────
 
   const gradientColors = [
@@ -242,7 +222,7 @@ const draftsData = drafts?.drafts?.slice(0, 1) || [];
                 </div>
                 <button 
                   type="button" 
-                  onClick={() => router.push(`/freelancer-profile/${lastCompletedJob.freelancerId}`)}
+                  onClick={() => router.push(`/user-profile/${lastCompletedJob.freelancerId}`)}
                   className="w-full border-2 border-[#1B365D] text-[#1B365D] font-semibold text-sm py-3 rounded-lg hover:bg-[#1B365D] hover:text-white transition-all duration-200"
                 >
                   Rehire

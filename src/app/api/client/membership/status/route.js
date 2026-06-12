@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import clientPromise, { DB_NAME, COLLECTIONS } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { verifyAuth, unauthorizedResponse } from "@/lib/auth.middleware";
+import { getOrSetCache, invalidateCache } from "@/lib/redis";
 
 /**
  * GET /api/client/membership/status
@@ -13,41 +14,52 @@ export async function GET(req) {
     const auth = await verifyAuth(req);
     if (!auth.authenticated) return unauthorizedResponse(auth.error);
 
-    const client = await clientPromise;
-    const db = client.db(DB_NAME);
-    const userId = new ObjectId(auth.userId);
+    const cacheKey = `api:client:membership:status:${auth.userId}`;
 
-    const sub = await db
-      .collection(COLLECTIONS.CLIENT_SUBSCRIPTIONS)
-      .findOne({ userId });
+    const result = await getOrSetCache(
+      cacheKey,
+      async () => {
+        const client = await clientPromise;
+        const db = client.db(DB_NAME);
+        const userId = new ObjectId(auth.userId);
 
-    if (!sub) {
-      return NextResponse.json({
-        success: true,
-        subscription: {
-          plan: "free",
-          planLabel: "Free",
-          bitsTotal: 10,
-          bitsUsed: 0,
-          bitsRemaining: 10,
-          subscriptionId: null,
-        },
-      });
-    }
+        const sub = await db
+          .collection(COLLECTIONS.CLIENT_SUBSCRIPTIONS)
+          .findOne({ userId });
 
-    const bitsRemaining = Math.max(0, sub.bitsTotal - (sub.bitsUsed || 0));
+        if (!sub) {
+          return {
+            subscription: {
+              plan: "free",
+              planLabel: "Free",
+              bitsTotal: 10,
+              bitsUsed: 0,
+              bitsRemaining: 10,
+              subscriptionId: null,
+            },
+          };
+        }
+
+        const bitsRemaining = Math.max(0, sub.bitsTotal - (sub.bitsUsed || 0));
+
+        return {
+          subscription: {
+            plan: sub.plan,
+            planLabel: sub.planLabel,
+            bitsTotal: sub.bitsTotal,
+            bitsUsed: sub.bitsUsed || 0,
+            bitsRemaining,
+            subscriptionId: sub.subscriptionId,
+            expiresAt: sub.expiresAt,
+          },
+        };
+      },
+      300 // 5 minutes
+    );
 
     return NextResponse.json({
       success: true,
-      subscription: {
-        plan: sub.plan,
-        planLabel: sub.planLabel,
-        bitsTotal: sub.bitsTotal,
-        bitsUsed: sub.bitsUsed || 0,
-        bitsRemaining,
-        subscriptionId: sub.subscriptionId,
-        expiresAt: sub.expiresAt,
-      },
+      ...result,
     });
   } catch (error) {
     console.error("Client membership status error:", error);
@@ -94,6 +106,9 @@ export async function POST(req) {
       },
       { upsert: true }
     );
+
+    // Invalidate client membership status cache
+    await invalidateCache(`api:client:membership:status:${auth.userId}`);
 
     return NextResponse.json({
       success: true,

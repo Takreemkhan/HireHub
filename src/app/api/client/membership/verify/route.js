@@ -3,6 +3,7 @@ import crypto from "crypto";
 import clientPromise, { DB_NAME, COLLECTIONS } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { verifyAuth, unauthorizedResponse } from "@/lib/auth.middleware";
+import { invalidateCache } from "@/lib/redis";
 
 const PLAN_CONFIG = {
   plus: { bitsTotal: 30, label: "Plus" },
@@ -80,6 +81,9 @@ export async function POST(req) {
       },
       { upsert: true, returnDocument: "after" }
     );
+
+    // Invalidate client membership status cache
+    await invalidateCache(`api:client:membership:status:${auth.userId}`);
 
     return NextResponse.json(
       {

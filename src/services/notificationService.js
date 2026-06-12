@@ -39,6 +39,19 @@ export async function createNotification({
     const result = await db.collection(COLLECTION).insertOne(doc);
     const notification = { ...doc, _id: result.insertedId };
 
+    // Invalidate Redis caches for recipient notifications
+    try {
+        const { invalidateCache, redis } = await import("@/lib/redis");
+        await invalidateCache([`api:notifications:unread:${recipientId}`]);
+        if (redis) {
+            const keys = await redis.keys(`api:notifications:list:${recipientId}:*`);
+            if (keys.length > 0) {
+                await redis.del(...keys);
+            }
+        }
+    } catch (err) {
+        console.warn("⚠️ Could not invalidate notifications cache:", err.message);
+    }
 
     try {
         const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";

@@ -19,6 +19,7 @@ import Transactions from './components/SettingsSection/Transactions';
 import PayFreelancers from './components/SettingsSection/PayFreelancers';
 import Navbar from '../client/components/navbar';
 import { useCurrentJobsClients, useProfileDetails, useGetContactsInfo } from '../hook/useProfile';
+import { useClientMembershipStatus } from '@/hooks/queries/useClientDashboard';
 import { useSession } from 'next-auth/react';
 import CardSkeleton from '@/components/Loader/Loader';
 
@@ -189,36 +190,21 @@ function ClientDashboardInner() {
   };
 
   // Bits state (mirrors freelancer sidebar)
-  const [bitsRemaining, setBitsRemaining] = useState<number | null>(null);
-  const [bitsTotal, setBitsTotal] = useState<number | null>(null);
-  const [planLabel, setPlanLabel] = useState<string>('Free');
+  const { data: membershipData } = useClientMembershipStatus();
   const [imageError, setImageError] = useState(false);
 
-  useEffect(() => {
-    const fetchMembership = async () => {
-      try {
-        const storedRemaining = localStorage.getItem('clientBitsRemaining');
-        const storedTotal = localStorage.getItem('clientBitsTotal');
-        const storedPlan = localStorage.getItem('clientMembershipPlan');
-        if (storedRemaining !== null) setBitsRemaining(Number(storedRemaining));
-        if (storedTotal !== null) setBitsTotal(Number(storedTotal));
-        if (storedPlan) setPlanLabel(storedPlan);
+  const bitsRemaining = membershipData?.bitsRemaining ?? null;
+  const bitsTotal = membershipData?.bitsTotal ?? null;
+  const planLabel = membershipData?.planLabel ?? 'Free';
 
-        const response = await fetch('/api/client/membership/status');
-        const data = await response.json();
-        if (data.success) {
-          setBitsRemaining(data.subscription.bitsRemaining);
-          setBitsTotal(data.subscription.bitsTotal);
-          setPlanLabel(data.subscription.planLabel);
-          // keep currentPlan badge in sync
-          setCurrentPlan(data.subscription.planLabel);
-        }
-      } catch (error) {
-        console.error('Error fetching client membership:', error);
-      }
-    };
-    fetchMembership();
-  }, []);
+  useEffect(() => {
+    if (membershipData) {
+      setCurrentPlan(membershipData.planLabel);
+      localStorage.setItem('clientBitsRemaining', String(membershipData.bitsRemaining));
+      localStorage.setItem('clientBitsTotal', String(membershipData.bitsTotal));
+      localStorage.setItem('clientMembershipPlan', membershipData.planLabel);
+    }
+  }, [membershipData]);
 
   const { data: currentJobs, isLoading, error } = useCurrentJobsClients();
 

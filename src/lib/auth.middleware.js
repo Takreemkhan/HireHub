@@ -10,6 +10,36 @@ export async function verifyAuth(req) {
     });
 
     if (!token) {
+      // Fallback to checking standard JWT Bearer token in Authorization header
+      let authHeader = null;
+      if (req.headers && typeof req.headers.get === "function") {
+        authHeader = req.headers.get("authorization");
+      } else if (req.headers && typeof req.headers === "object") {
+        authHeader = req.headers.authorization || req.headers.Authorization;
+      }
+
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const jwtToken = authHeader.substring(7);
+        const jwt = require("jsonwebtoken");
+        try {
+          const decoded = jwt.verify(
+            jwtToken,
+            process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || "hirehub_default_secret_key_2024"
+          );
+          if (decoded) {
+            return {
+              authenticated: true,
+              userId: decoded.userId || decoded.id || decoded.sub,
+              email: decoded.email,
+              name: decoded.name || "",
+              token: decoded
+            };
+          }
+        } catch (jwtError) {
+          console.error("JWT Verification failed in fallback:", jwtError);
+        }
+      }
+
       return {
         authenticated: false,
         error: "Unauthorized - No valid token found",

@@ -101,6 +101,7 @@
 
 import { NextResponse } from "next/server";
 import { getJobById, updateJobById, deleteJobById } from "@/app/controllers/job.controller";
+import { getOrSetCache, invalidateCache } from "@/lib/redis";
 
 /**
  * GET - Get job by ID
@@ -110,7 +111,14 @@ export async function GET(req, context) {
   try {
     //  CRITICAL: Await params in Next.js 15
     const params = await context.params;
-    const job = await getJobById(params.id);
+    
+    const job = await getOrSetCache(
+      `api:jobs:${params.id}`,
+      async () => {
+        return await getJobById(params.id);
+      },
+      300 // Cache for 5 minutes
+    );
 
     if (!job) {
       return NextResponse.json({ message: "Job not found" }, { status: 404 });
@@ -142,6 +150,9 @@ export async function PUT(req, context) {
       return NextResponse.json({ message: "Job not found" }, { status: 404 });
     }
 
+    // Invalidate the specific job cache and the all jobs list cache
+    await invalidateCache([`api:jobs:${params.id}`, 'api:jobs:all']);
+
     return NextResponse.json(
       { message: "Job updated successfully", job: updatedJob },
       { status: 200 }
@@ -168,6 +179,9 @@ export async function DELETE(req, context) {
     if (!deleted) {
       return NextResponse.json({ message: "Job not found" }, { status: 404 });
     }
+
+    // Invalidate the specific job cache and the all jobs list cache
+    await invalidateCache([`api:jobs:${params.id}`, 'api:jobs:all']);
 
     return NextResponse.json(
       { message: "Job deleted successfully" },

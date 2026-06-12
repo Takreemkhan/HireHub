@@ -108,6 +108,7 @@ import { NextResponse } from "next/server";
 import { postJob } from "@/app/controllers/job-post-with-payment.controller";
 import { getAllJobs } from "@/app/controllers/job.controller";
 import { verifyAuth, unauthorizedResponse } from "@/lib/auth.middleware";
+import { getOrSetCache, invalidateCache } from "@/lib/redis";
 
 /* POST - Post a new job (with automatic payment check) */
 
@@ -193,6 +194,9 @@ export async function POST(req) {
     }
 
     // Job posted successfully (free)
+    // Invalidate jobs cache since a new job was added
+    await invalidateCache('api:jobs:all');
+
     return NextResponse.json(
       {
         success: true,
@@ -233,7 +237,13 @@ export async function POST(req) {
  */
 export async function GET() {
   try {
-    const jobs = await getAllJobs();
+    const jobs = await getOrSetCache(
+      'api:jobs:all',
+      async () => {
+        return await getAllJobs();
+      },
+      300 // Cache for 5 minutes
+    );
 
     return NextResponse.json(
       {

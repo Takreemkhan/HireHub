@@ -1,29 +1,9 @@
-"use client";
-
-import React, { useState, useEffect } from "react";
+import React from "react";
 import FreelancerCard from "@/app/freelancer-profiles/components/FreelancerCard";
+import { useSavedFreelancers } from "@/hooks/queries/useClientDashboard";
 
 export default function SavedFreelancersSection() {
-    const [freelancers, setFreelancers] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        fetchSaved();
-    }, []);
-
-    const fetchSaved = async () => {
-        try {
-            const res = await fetch("/api/client/saved-freelancers", { credentials: "include" });
-            const data = await res.json();
-            if (!data.success) throw new Error(data.message || "Failed to load");
-            setFreelancers(data.freelancers || []);
-        } catch (err: any) {
-            setError(err.message || "Something went wrong.");
-        } finally {
-            setLoading(false);
-        }
-    };
+    const { data: freelancers = [], isLoading: loading, error, refetch: fetchSaved } = useSavedFreelancers();
 
     const mapProfile = (profile: any) => {
         const skills = Array.isArray(profile.skills)
@@ -71,8 +51,8 @@ export default function SavedFreelancersSection() {
     if (error) {
         return (
             <div className="bg-red-50 text-red-600 p-6 rounded-xl border border-red-100 text-center">
-                <p>{error}</p>
-                <button onClick={fetchSaved} className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg">Try Again</button>
+                <p>{(error as any)?.message || "Something went wrong."}</p>
+                <button onClick={() => fetchSaved()} className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg">Try Again</button>
             </div>
         );
     }
@@ -97,7 +77,7 @@ export default function SavedFreelancersSection() {
     return (
         <div className="p-4 sm:p-6 lg:p-8">
             <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                {freelancers.map((profile) => (
+                {freelancers.map((profile: any) => (
                     <FreelancerCard key={profile._id} {...mapProfile(profile)} isSavedInitial={true} />
                 ))}
             </div>

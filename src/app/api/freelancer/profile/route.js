@@ -6,6 +6,7 @@ import {
   getAllFreelancerProfiles
 } from "@/app/controllers/freelancer-profile.controller";
 import { verifyAuth, unauthorizedResponse } from "@/lib/auth.middleware";
+import { getOrSetCache, invalidateCache, redis } from "@/lib/redis";
 
 /**
  * POST - Create or Update Freelancer Profile
@@ -21,6 +22,15 @@ export async function POST(req) {
     const body = await req.json();
 
     const profile = await upsertFreelancerProfile(auth.userId, body);
+
+    // Invalidate the cache for this specific profile and the list of profiles
+    await invalidateCache([`api:freelancer:profile:${auth.userId}`]);
+    if (redis) {
+      const keys = await redis.keys('api:freelancer:profiles:all:*');
+      if (keys.length > 0) {
+        await redis.del(...keys);
+      }
+    }
 
     return NextResponse.json(
       {
@@ -58,7 +68,13 @@ export async function GET(req) {
 
     // Get single profile
     if (userId) {
-      const profile = await getFreelancerProfile(userId);
+      const profile = await getOrSetCache(
+        `api:freelancer:profile:${userId}`,
+        async () => {
+          return await getFreelancerProfile(userId);
+        },
+        600 // Cache for 10 minutes
+      );
 
       if (!profile) {
         return NextResponse.json(
@@ -82,7 +98,6 @@ export async function GET(req) {
     // Get all profiles with filters
     const filters = {
       skills: searchParams.get("skills")?.split(","),
-
       title: searchParams.get("title")?.split(","),
       minRate: searchParams.get("minRate"),
       maxRate: searchParams.get("maxRate"),
@@ -90,7 +105,15 @@ export async function GET(req) {
       search: searchParams.get("search")
     };
 
-    const result = await getAllFreelancerProfiles(page, limit, filters);
+    const cacheKey = `api:freelancer:profiles:all:${page}:${limit}:${JSON.stringify(filters)}`;
+
+    const result = await getOrSetCache(
+      cacheKey,
+      async () => {
+        return await getAllFreelancerProfiles(page, limit, filters);
+      },
+      300 // Cache for 5 minutes
+    );
 
     return NextResponse.json(
       {
@@ -134,6 +157,15 @@ export async function DELETE(req) {
         },
         { status: 404 }
       );
+    }
+
+    // Invalidate caches
+    await invalidateCache([`api:freelancer:profile:${auth.userId}`]);
+    if (redis) {
+      const keys = await redis.keys('api:freelancer:profiles:all:*');
+      if (keys.length > 0) {
+        await redis.del(...keys);
+      }
     }
 
     return NextResponse.json(

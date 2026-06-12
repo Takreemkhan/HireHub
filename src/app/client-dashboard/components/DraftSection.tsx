@@ -277,6 +277,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Plus, MoreVertical, Trash2, Edit, Send, Clock, FileText } from 'lucide-react';
+import { useGetClientDrafts } from "@/app/hook/useProfile";
+import { useDeleteDraft, usePublishDraft } from "@/hooks/queries/useClientDashboard";
 
 export default function DraftSection() {
   const router = useRouter();
@@ -285,47 +287,13 @@ export default function DraftSection() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const menuRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
-  // API state
-  const [drafts, setDrafts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  // React Query Hooks
+  const { data, isLoading: loading, error: queryError, refetch } = useGetClientDrafts(businessId);
+  const deleteDraftMutation = useDeleteDraft();
+  const publishDraftMutation = usePublishDraft();
 
-  // Fetch drafts from API
-  useEffect(() => {
-    fetchDrafts();
-  }, []);
-
-  const fetchDrafts = async () => {
-    try {
-      setLoading(true);
-      setError('');
-
-      console.log('📥 Fetching drafts from GET /api/jobs/drafts...');
-
-      const fetchUrl = businessId ? `/api/jobs/drafts?businessId=${businessId}` : '/api/jobs/drafts';
-      const res = await fetch(fetchUrl);
-      const data = await res.json();
-
-      console.log('📦 Drafts response:', data);
-
-      if (!res.ok || !data.success) {
-        if (res.status === 401) {
-          router.push('/sign-in-page');
-          return;
-        }
-        throw new Error(data.message || 'Failed to load drafts');
-      }
-
-      setDrafts(data.drafts || []);
-      console.log(`✅ Loaded ${data.drafts?.length || 0} drafts`);
-
-    } catch (err: any) {
-      console.error('❌ Failed to fetch drafts:', err);
-      setError(err.message || 'Failed to load drafts');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const drafts = data?.drafts || [];
+  const error = queryError ? (queryError as any).message || 'Failed to load drafts' : '';
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -343,21 +311,8 @@ export default function DraftSection() {
   const handleDelete = async (draftId: string) => {
     try {
       console.log('🗑️ Deleting draft:', draftId);
-
-      const res = await fetch(`/api/jobs/drafts/${draftId}`, {
-        method: 'DELETE',
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Failed to delete draft');
-      }
-
+      await deleteDraftMutation.mutateAsync(draftId);
       console.log('✅ Draft deleted');
-
-      // Refresh drafts list
-      fetchDrafts();
       setOpenMenuId(null);
     } catch (err: any) {
       console.error('❌ Delete error:', err);
@@ -368,26 +323,8 @@ export default function DraftSection() {
   const handlePublishDraft = async (draftId: string) => {
     try {
       console.log('📤 Publishing draft:', draftId);
-
-      // ✅ NEW BACKEND: Must send { action: "publish" }
-      const res = await fetch(`/api/jobs/drafts/${draftId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'publish' }), // ← Required!
-      });
-
-      const data = await res.json();
-
-      console.log('📥 Publish response:', data);
-
-      // ✅ Check success field
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Failed to publish draft');
-      }
-
+      await publishDraftMutation.mutateAsync(draftId);
       console.log('✅ Draft published successfully!');
-
-      // Draft published successfully! Redirect to dashboard
       router.push('/client-dashboard');
     } catch (err: any) {
       console.error('❌ Publish error:', err);
@@ -528,7 +465,7 @@ export default function DraftSection() {
           <div className="text-center py-16">
             <p className="text-red-600 mb-4">{error}</p>
             <button
-              onClick={fetchDrafts}
+              onClick={() => refetch()}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               Try Again
@@ -549,7 +486,7 @@ export default function DraftSection() {
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {drafts.map((draft) => (
+          {drafts.map((draft: any) => (
             <DraftCard
               key={draft._id}
               draft={draft}

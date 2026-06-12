@@ -3,6 +3,7 @@ import crypto from "crypto";
 import clientPromise, { DB_NAME } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { verifyAuth, unauthorizedResponse } from "@/lib/auth.middleware";
+import { invalidateCache } from "@/lib/redis";
 
 /**
  * Fixed bid packs (must match create-order route)
@@ -118,6 +119,9 @@ export async function POST(req) {
     const bidsTotal = updated.bidsTotal ?? 0;
     const bidsUsed = updated.bidsUsed ?? 0;
     const bidsRemaining = Math.max(0, bidsTotal - bidsUsed);
+
+    // Invalidate freelancer membership status cache
+    await invalidateCache(`api:freelancer:membership:status:${auth.userId}`);
 
     return NextResponse.json(
       {

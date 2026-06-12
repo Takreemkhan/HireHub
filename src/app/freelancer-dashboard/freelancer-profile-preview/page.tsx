@@ -6,7 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useState, useEffect, useCallback, Suspense } from "react";
 import ResumeVideoManager from "../components/ResumeVideoManager";
-import { useGetResumeVideos, useGetResumeVideosByUserId } from "@/app/hook/useProfile";
+import { useGetResumeVideos, useGetResumeVideosByUserId, useProfileDetails, useCurrentJobsClients } from "@/app/hook/useProfile";
+import { useSavedFreelancersIds, useToggleSaveFreelancer } from "@/hooks/queries/useClientDashboard";
 
 // Brand colors: Primary #1B365D | Secondary #2E5984 | Accent #FF6B35
 
@@ -86,22 +87,31 @@ function FreelancerProfilePreviewContent() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const userId = (session?.user as { id?: string })?.id ?? null;
-  const [profile, setProfile] = useState(apiToPreviewProfile(null));
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [chatLoading, setChatLoading] = useState(false);
   const searchParams = useSearchParams();
   const freelancerId = searchParams.get("userId") ?? "";
 
   const UserId = (freelancerId || userId) ?? "";
-  const [isSaved, setIsSaved] = useState(false);
-  const [saveLoading, setSaveLoading] = useState(false);
+
+  // React Query Hooks
+  const { data: profileQueryData, isLoading: profileLoading, error: profileQueryError } = useProfileDetails(UserId);
+  const profile = apiToPreviewProfile(profileQueryData?.profile || null);
+  const loading = (sessionStatus === "loading") || (!!UserId && profileLoading);
+  const error = profileQueryError ? (profileQueryError as any).message || "Failed to load profile" : null;
+
+  // Saved Status & Toggle Mutation
+  const { data: savedIds } = useSavedFreelancersIds(!!freelancerId && sessionStatus === "authenticated");
+  const toggleSaveMutation = useToggleSaveFreelancer();
+  const isSaved = savedIds?.includes(freelancerId) ?? false;
+  const saveLoading = toggleSaveMutation.isPending;
 
   // Hire Modal State
   const [isHireModalOpen, setIsHireModalOpen] = useState(false);
-  const [clientJobs, setClientJobs] = useState<any[]>([]);
-  const [loadingJobs, setLoadingJobs] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState("");
+
+  // Current Jobs Query
+  const { data: currentJobsData, isLoading: loadingJobs } = useCurrentJobsClients();
+  const clientJobs = currentJobsData?.jobs?.filter((j: any) => !j.hiredFreelancer) || [];
 
   // Video Fetching
   const ownQuery = useGetResumeVideos();
@@ -109,88 +119,15 @@ function FreelancerProfilePreviewContent() {
   const videoData = freelancerId ? targetQuery.data?.data : ownQuery.data?.data;
   const firstVideo = videoData?.[0] || null;
 
-  const fetchSaved = useCallback(async () => {
-    if (!freelancerId) return;
-    try {
-      const res = await fetch('/api/client/saved-freelancers?idsOnly=true', { credentials: 'include' });
-      const data = await res.json();
-      if (data.success && Array.isArray(data.ids)) {
-        setIsSaved(data.ids.includes(freelancerId));
-      }
-    } catch { /* non-critical */ }
-  }, [freelancerId]);
-
   const handleToggleSave = useCallback(async () => {
     if (!freelancerId) return;
-    setSaveLoading(true);
     try {
-      const res = await fetch('/api/client/saved-freelancers', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ freelancerId }),
-      });
-      const data = await res.json();
-      if (data.success) setIsSaved(data.isSaved);
-    } catch { /* non-critical */ } finally {
-      setSaveLoading(false);
-    }
-  }, [freelancerId]);
+      await toggleSaveMutation.mutateAsync(freelancerId);
+    } catch { /* non-critical */ }
+  }, [freelancerId, toggleSaveMutation]);
 
-  const fetchProfile = useCallback(async () => {
-    if (!userId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/freelancer/profile?userId=${encodeURIComponent(UserId)}`, { credentials: "include" });
-      const json = await res.json();
-
-      if (!res.ok) {
-        if (res.status === 404) setProfile(apiToPreviewProfile(null));
-        else setError(json.message || "Failed to load profile");
-        return;
-      }
-      setProfile(apiToPreviewProfile(json.profile as ApiProfile));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load profile");
-      setProfile(apiToPreviewProfile(null));
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, UserId]);
-
-  useEffect(() => {
-    if (sessionStatus === "loading" || !userId) {
-      if (sessionStatus === "unauthenticated") setLoading(false);
-      return;
-    }
-    fetchProfile();
-  }, [sessionStatus, userId, fetchProfile]);
-
-  useEffect(() => {
-    if (sessionStatus === "authenticated" && freelancerId) {
-      fetchSaved();
-    }
-  }, [sessionStatus, freelancerId, fetchSaved]);
-
-  const handleOpenHireModal = async () => {
+  const handleOpenHireModal = () => {
     setIsHireModalOpen(true);
-    if (clientJobs.length === 0) {
-      setLoadingJobs(true);
-      try {
-        const res = await fetch("/api/client/jobs/current", { credentials: "include" });
-        const data = await res.json();
-        if (data.success && Array.isArray(data.jobs)) {
-          // Filter out jobs already assigned
-          const available = data.jobs.filter((j: any) => !j.hiredFreelancer);
-          setClientJobs(available);
-        }
-      } catch (e) {
-        console.error("Failed to fetch jobs", e);
-      } finally {
-        setLoadingJobs(false);
-      }
-    }
   };
 
   const handleOpenChat = useCallback(async (jobId?: string) => {
@@ -530,26 +467,7 @@ function FreelancerProfilePreviewContent() {
                 </div>
               </SideCard>
 
-              {/* Contact */}
-              <SideCard title="Contact Links">
-                <div className="space-y-1">
-                  {[
-                    { label: profile.contact.email, icon: "✉️", href: `mailto:${profile.contact.email}` },
-                    { label: profile.contact.website, icon: "🌐", href: `https://${profile.contact.website}` },
-                    { label: profile.contact.linkedin, icon: "💼", href: `https://${profile.contact.linkedin}` },
-                    { label: profile.contact.github, icon: "💻", href: `https://${profile.contact.github}` },
-                  ].filter(c => c.label).map((c) => (
-                    <a key={c.label} href={c.href} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-3 text-sm transition p-3 rounded-2xl hover:bg-gray-50 group font-medium" style={{ color: "#2E5984" }}>
-                      <span className="text-xl group-hover:scale-110 transition">{c.icon}</span>
-                      <span className="truncate">{c.label}</span>
-                    </a>
-                  ))}
-                  {![profile.contact.email, profile.contact.website, profile.contact.linkedin, profile.contact.github].some(Boolean) && (
-                    <p className="text-sm text-gray-400">No contact links provided.</p>
-                  )}
-                </div>
-              </SideCard>
+
 
             </div>
           </div>
@@ -587,7 +505,7 @@ function FreelancerProfilePreviewContent() {
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[280px] overflow-y-auto pr-2 custom-scrollbar">
-                  {clientJobs.map(job => (
+                  {clientJobs.map((job: any) => (
                     <label key={job._id} className={`flex items-start gap-4 p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${selectedJobId === job._id ? 'border-[#FF6B35] bg-orange-50/30 shadow-md' : 'border-gray-100 hover:border-[#2E5984]/30 hover:bg-gray-50'}`}>
                       <div className="mt-1">
                         <input type="radio" name="jobSelect" value={job._id} checked={selectedJobId === job._id} onChange={() => setSelectedJobId(job._id)} className="w-4 h-4 text-[#FF6B35] focus:ring-[#FF6B35] border-gray-300" />

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import clientPromise, { DB_NAME } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { verifyAuth, unauthorizedResponse } from "@/lib/auth.middleware";
+import { invalidateCache, redis } from "@/lib/redis";
 
 /**
  * POST /api/jobs/[id]/review
@@ -80,6 +81,17 @@ export async function POST(req, { params }) {
                         }
                     }
                 );
+            }
+        }
+
+        // Invalidate Redis caches for the job, general jobs, and client completed/current jobs
+        await invalidateCache([`api:jobs:${params.id}`, 'api:jobs:all']);
+        if (redis) {
+            const clientKeys = await redis.keys(`api:client:jobs:*:${job.clientId}:*`);
+            const freelancerKeys = job.freelancerId ? await redis.keys(`api:client:jobs:*:${job.freelancerId}:*`) : [];
+            const keysToDel = [...clientKeys, ...freelancerKeys];
+            if (keysToDel.length > 0) {
+                await redis.del(...keysToDel);
             }
         }
 
