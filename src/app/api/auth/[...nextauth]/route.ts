@@ -10,7 +10,7 @@ import fs from "fs";
 
 function logToFile(type: string, message: any, metadata?: any) {
   try {
-    const logPath = "c:/Users/SAMEER KHAN/Documents/HireHub_4_5/nextauth_debug.log";
+    const logPath = "./nextauth_debug.log";
     const logEntry = JSON.stringify({
       timestamp: new Date().toISOString(),
       type,
