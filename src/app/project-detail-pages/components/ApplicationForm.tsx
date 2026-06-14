@@ -4,14 +4,23 @@ import React, { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Icon from '@/components/ui/AppIcon';
+import { getCurrencySymbol } from '@/utils/currency';
+
+function getFileNameFromUrl(url: string): string {
+  const parts = url.split('/');
+  const rawName = parts[parts.length - 1];
+  const match = rawName.match(/^\d+_[a-z0-9]+_(.+)$/);
+  return match ? match[1] : rawName;
+}
 
 interface ApplicationFormProps {
   projectTitle: string;
   jobId: string; // Add jobId prop
   onSubmit: () => void;
+  currency?: string;
 }
 
-const ApplicationForm = ({ projectTitle, jobId, onSubmit }: ApplicationFormProps) => {
+const ApplicationForm = ({ projectTitle, jobId, onSubmit, currency }: ApplicationFormProps) => {
   const { data: session } = useSession();
   const router = useRouter();
 
@@ -19,6 +28,11 @@ const ApplicationForm = ({ projectTitle, jobId, onSubmit }: ApplicationFormProps
   const [proposedRate, setProposedRate] = useState('');
   const [estimatedDuration, setEstimatedDuration] = useState('');
   const [attachments, setAttachments] = useState<string[]>([]);
+  
+  const userId = session?.user?.id;
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [attachmentError, setAttachmentError] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -66,6 +80,7 @@ const ApplicationForm = ({ projectTitle, jobId, onSubmit }: ApplicationFormProps
           coverLetter: coverLetter.trim(),
           estimatedDuration: estimatedDuration || undefined,
           attachments: attachments.length ? attachments : undefined,
+          currency: currency || 'GBP',
         }),
       });
 
@@ -103,7 +118,54 @@ const ApplicationForm = ({ projectTitle, jobId, onSubmit }: ApplicationFormProps
   };
 
   const handleAddAttachment = () => {
-    setAttachments([...attachments, `Portfolio_Sample_${attachments.length + 1}.pdf`]);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    if (!userId) {
+      setAttachmentError('User not authenticated');
+      return;
+    }
+    
+    setAttachmentError('');
+    setUploadingAttachment(true);
+    
+    try {
+      const formData = new FormData();
+      const fileArr = Array.from(files);
+      fileArr.forEach(file => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+        if (!allowedTypes.includes(file.type)) {
+          throw new Error(`Invalid format for file: ${file.name}. Only JPEG, PNG, and PDF are allowed.`);
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          throw new Error(`File ${file.name} is too large. Maximum size is 5MB.`);
+        }
+        formData.append('files', file);
+      });
+      
+      formData.append('documentType', 'portfolio');
+      
+      const res = await fetch(`/api/client/${userId}/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'File upload failed');
+      }
+      
+      const newUrls = data.data.files.map((f: any) => f.url);
+      setAttachments([...attachments, ...newUrls]);
+    } catch (err: any) {
+      setAttachmentError(err.message || 'File upload failed');
+    } finally {
+      setUploadingAttachment(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleRemoveAttachment = (index: number) => {
@@ -158,11 +220,11 @@ const ApplicationForm = ({ projectTitle, jobId, onSubmit }: ApplicationFormProps
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Proposed Rate (£) *
+                Proposed Rate ({currency || 'GBP'}) *
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                  £
+                  {getCurrencySymbol(currency || 'GBP')}
                 </span>
                 <input
                   type="number"
@@ -201,32 +263,46 @@ const ApplicationForm = ({ projectTitle, jobId, onSubmit }: ApplicationFormProps
               Attachments (Optional)
             </label>
             <div className="space-y-2">
-              {attachments.map((attachment, index) => (
+              {attachments.map((url, index) => (
                 <div
                   key={index}
                   className="flex items-center justify-between p-3 bg-muted rounded-lg"
                 >
-                  <div className="flex items-center space-x-3">
-                    <Icon name="DocumentIcon" size={20} className="text-primary" />
-                    <span className="text-sm text-foreground">{attachment}</span>
+                  <div className="flex items-center space-x-3 truncate pr-4">
+                    <Icon name="DocumentIcon" size={20} className="text-primary flex-shrink-0" />
+                    <span className="text-sm text-foreground truncate">{getFileNameFromUrl(url)}</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => handleRemoveAttachment(index)}
-                    className="p-1 hover:bg-destructive/10 rounded transition-colors"
+                    className="p-1 hover:bg-destructive/10 rounded transition-colors flex-shrink-0"
                   >
                     <Icon name="XMarkIcon" size={18} className="text-destructive" />
                   </button>
                 </div>
               ))}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                className="hidden"
+                accept=".pdf,.png,.jpg,.jpeg"
+                multiple
+              />
               <button
                 type="button"
                 onClick={handleAddAttachment}
-                className="w-full flex items-center justify-center space-x-2 px-4 py-3 border-2 border-dashed border-input rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
+                disabled={uploadingAttachment}
+                className="w-full flex items-center justify-center space-x-2 px-4 py-3 border-2 border-dashed border-input rounded-lg hover:border-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
               >
                 <Icon name="PlusIcon" size={20} className="text-primary" />
-                <span className="text-sm font-medium text-primary">Add Portfolio Sample</span>
+                <span className="text-sm font-medium text-primary">
+                  {uploadingAttachment ? 'Uploading portfolio sample...' : 'Add Portfolio Sample'}
+                </span>
               </button>
+              {attachmentError && (
+                <p className="text-xs text-red-600 font-medium mt-1">{attachmentError}</p>
+              )}
             </div>
           </div>
 

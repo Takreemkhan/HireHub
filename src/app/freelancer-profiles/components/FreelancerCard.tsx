@@ -630,16 +630,7 @@ const FreelancerCard = ({
               ${isHireClicked ? 'bg-[#FF6B35] text-white' : 'bg-[#1B365D] text-white'}
             `}
           >
-            <span>Hire  </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleContact}
-            disabled={!isHydrated}
-            className="px-4 py-2.5 bg-muted text-foreground rounded-lg font-display font-semibold hover:bg-accent hover:text-accent-foreground transition-all duration-300 flex items-center justify-center disabled:opacity-50"
-          >
-            <Icon name="ChatBubbleLeftRightIcon" size={20} />
+            <span>View Profile</span>
           </button>
         </div>
       </div>

@@ -100,6 +100,7 @@ import { useRouter, useParams } from 'next/navigation';
 import CompletedJobCard from './CompletedJobCard';
 import { Briefcase } from 'lucide-react';
 import { useCompletedJobs } from '@/app/hook/useProfile';
+import { getCurrencySymbol } from '@/utils/currency';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -110,6 +111,7 @@ interface CompletedJob {
   finalAmount?: number;
   durationInDays?: number;
   completedAt: string;
+  currency?: string;
   clientReview?: {
     rating: number;
     comment?: string;
@@ -132,9 +134,10 @@ function formatDuration(days?: number): string {
 }
 
 // Format Price helper
-function formatPrice(amount?: number): string {
+function formatPrice(amount?: number, currencyCode?: string): string {
   if (!amount) return 'Not specified';
-  return `£${amount.toLocaleString()}`;
+  const symbol = getCurrencySymbol(currencyCode || 'GBP');
+  return `${symbol}${amount.toLocaleString()}`;
 }
 
 // ─── Loading Skeleton ─────────────────────────────────────────────────────────
@@ -236,7 +239,7 @@ export default function CompletedJobsSection() {
                 title={job.title}
                 rating={job.clientReview?.rating || 0}
                 duration={formatDuration(job.durationInDays)}
-                price={formatPrice(job.finalAmount || job.budget)}
+                price={formatPrice(job.finalAmount || job.budget, job.currency)}
                 completedAt={job.completedAt}
                 onClick={() => setActiveJob(job)}
               />
@@ -281,7 +284,7 @@ export default function CompletedJobsSection() {
 
               <div>
                 <p className="text-gray-500">Final Amount</p>
-                <p className="font-semibold">{formatPrice(activeJob.finalAmount || activeJob.budget)}</p>
+                <p className="font-semibold">{formatPrice(activeJob.finalAmount || activeJob.budget, activeJob.currency)}</p>
               </div>
 
               {activeJob.freelancerInfo && (

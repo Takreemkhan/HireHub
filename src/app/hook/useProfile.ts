@@ -42,6 +42,8 @@ export const useProfile = (filters?: {
   return useQuery({
     queryKey: ["profile", filters],
     queryFn: () => getFreelancerProfile(filters),
+    staleTime: 5 * 60 * 1000,  // 5 minutes
+    gcTime: 10 * 60 * 1000,
   });
 };
 
@@ -51,6 +53,8 @@ export const useProfileDetails = (userId: string) => {
     queryKey: ["profile", userId],
     queryFn: () => getFreelancerProfileDetails(userId),
     enabled: !!userId,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 };
 
@@ -80,6 +84,8 @@ export const useCurrentJobsClients = (businessId?: string) => {
   return useQuery({
     queryKey: ["current-jobs-clients", businessId],
     queryFn: () => getCurrentJobs(businessId),
+    staleTime: 2 * 60 * 1000,  // 2 minutes — jobs change more often
+    gcTime: 5 * 60 * 1000,
   });
 };
 
@@ -112,6 +118,7 @@ export const usegetJobInvites = (jobId: string) => {
   return useQuery({
     queryKey: ["get-job-invites", jobId],
     queryFn: () => getJobInvites(jobId),
+    staleTime: 5 * 60 * 1000,
   });
 };
 
@@ -120,6 +127,8 @@ export const usegetFreelancerMembershipPlan = () => {
   return useQuery({
     queryKey: ["get-freelancer-membership-plan"],
     queryFn: getFreelancerMembershipPlan,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 };
 
@@ -130,6 +139,7 @@ export const usegetFreelancerActivity = () => {
   return useQuery({
     queryKey: ["get-freelancer-activity"],
     queryFn: getFreelancerActivity,
+    staleTime: 3 * 60 * 1000,
   });
 };
 
@@ -196,6 +206,7 @@ export const useGetSavedJobs = () => {
   return useQuery({
     queryKey: ["get-saved-jobs"],
     queryFn: getSavedJobs,
+    staleTime: 5 * 60 * 1000,
   });
 };
 
@@ -211,6 +222,7 @@ export const useGetProposals = ({
     queryKey: ["proposals", jobId, freelancerId],
     queryFn: () => getProposals({ jobId, freelancerId }),
     enabled: !!jobId || !!freelancerId,
+    staleTime: 2 * 60 * 1000,
   });
 };
 
@@ -219,6 +231,8 @@ export const useGetClientMembershipPlan = () => {
   return useQuery({
     queryKey: ["get-client-membership-plan"],
     queryFn: getClientMembershipPlan,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 };
 
@@ -226,6 +240,7 @@ export const useGetClientDrafts = (businessId?: string) => {
   return useQuery({
     queryKey: ["get-client-drafts", businessId],
     queryFn: () => getClientDrafts(businessId),
+    staleTime: 3 * 60 * 1000,
   });
 };
 
@@ -233,6 +248,8 @@ export const useCompletedJobs = (page = 1, limit = 10, businessId?: string) => {
   return useQuery({
     queryKey: ["completed-jobs", page, limit, businessId],
     queryFn: () => getClientCompletedJobs(page, limit, businessId),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 };
 
@@ -256,6 +273,8 @@ export const useGetContactsInfo = ({ userId }: { userId: string }) => {
     queryKey: ["get-contacts-info", userId],
     queryFn: () => getContactsInfo({ userId }),
     enabled: !!userId,
+    staleTime: 10 * 60 * 1000,  // 10 minutes — contact info changes rarely
+    gcTime: 20 * 60 * 1000,
   });
 };
 

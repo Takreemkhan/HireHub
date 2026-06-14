@@ -64,6 +64,7 @@ function formatDate(dateString: string): string {
 
 import { useClientCompletedJobs } from "@/hooks/queries/useClientJobs";
 import { useMutation } from "@tanstack/react-query";
+import { getCurrencySymbol } from "@/utils/currency";
 
 export default function CompletedJobDetailPage() {
   const { id } = useParams();
@@ -215,7 +216,7 @@ export default function CompletedJobDetailPage() {
                     </span>
                     <span className="flex items-center gap-1.5 font-medium">
                       <DollarSign className="w-4 h-4 text-emerald-500" />
-                      £{job.finalAmount?.toLocaleString() || job.budget?.toLocaleString()}
+                      {getCurrencySymbol(job.currency || "GBP")}{job.finalAmount?.toLocaleString() || job.budget?.toLocaleString()}
                     </span>
                   </div>
 
@@ -462,7 +463,7 @@ export default function CompletedJobDetailPage() {
                       </div>
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-slate-500 font-medium">Hourly Rate</span>
-                        <span className="font-bold text-slate-900">{job.freelancerInfo.hourlyRate ? `£${job.freelancerInfo.hourlyRate}/hr` : "N/A"}</span>
+                        <span className="font-bold text-slate-900">{job.freelancerInfo.hourlyRate ? `${getCurrencySymbol(job.currency || "GBP")}${job.freelancerInfo.hourlyRate}/hr` : "N/A"}</span>
                       </div>
                     </div>
                   </div>

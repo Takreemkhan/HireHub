@@ -24,6 +24,7 @@ export const getClientCurrentJobs = async (clientId, page = 1, limit = 100, busi
       { clientId: clientId.toString() }
     ],
     isDraft: { $ne: true },
+    isDeleted: { $ne: true },
     status: { $in: ["open", "in-progress", "in progress"] }
   };
 
@@ -38,6 +39,7 @@ export const getClientCurrentJobs = async (clientId, page = 1, limit = 100, busi
       { clientId: clientId.toString() }
     ],
     isDraft: { $ne: true },
+    isDeleted: { $ne: true },
     status: { $in: ["open", "in-progress", "in progress", "completed"] }
   };
 
@@ -78,43 +80,47 @@ export const getClientCurrentJobs = async (clientId, page = 1, limit = 100, busi
     db.collection(COLLECTIONS.JOBS).countDocuments(totalQuery)
   ]);
 
-  // Enhance with freelancer info (if assigned)
-  const enhancedJobs = await Promise.all(
-    jobs.map(async (job) => {
-      let freelancerInfo = null;
+  // Bulk enhance with freelancer info (if assigned) & proposal count
+  const freelancerIds = jobs.map(j => toObjectId(j.freelancerId)).filter(Boolean);
+  const jobIds = jobs.map(j => j._id).filter(Boolean);
 
-      if (job.freelancerId) {
-        const freelancerId = toObjectId(job.freelancerId);
-        const freelancer = await db.collection(COLLECTIONS.USERS).findOne({
-          $or: [
-            { _id: freelancerId },
-            { _id: job.freelancerId.toString() }
-          ]
-        });
-
-        if (freelancer) {
-          freelancerInfo = {
-            _id: freelancer._id,
-            name: freelancer.name,
-            email: freelancer.email,
-            image: freelancer.image
-          };
-        }
-      }
-
-      // Get proposal count
-      const proposalCount = await db.collection(COLLECTIONS.PROPOSALS).countDocuments({
-        jobId: job._id,
-        status: { $ne: "rejected" }
-      });
-
-      return {
-        ...job,
-        freelancerInfo,
-        proposalCount
+  let freelancersMap = {};
+  if (freelancerIds.length > 0) {
+    const freelancers = await db.collection(COLLECTIONS.USERS).find({
+      _id: { $in: freelancerIds }
+    }).toArray();
+    freelancers.forEach(f => {
+      freelancersMap[f._id.toString()] = {
+        _id: f._id,
+        name: f.name,
+        email: f.email,
+        image: f.image
       };
-    })
-  );
+    });
+  }
+
+  let proposalCountsMap = {};
+  if (jobIds.length > 0) {
+    const proposalCounts = await db.collection(COLLECTIONS.PROPOSALS).aggregate([
+      { $match: { jobId: { $in: jobIds }, status: { $ne: "rejected" } } },
+      { $group: { _id: "$jobId", count: { $sum: 1 } } }
+    ]).toArray();
+    proposalCounts.forEach(pc => {
+      proposalCountsMap[pc._id.toString()] = pc.count;
+    });
+  }
+
+  const enhancedJobs = jobs.map((job) => {
+    const fid = job.freelancerId ? job.freelancerId.toString() : null;
+    const freelancerInfo = fid ? (freelancersMap[fid] || null) : null;
+    const proposalCount = proposalCountsMap[job._id.toString()] || 0;
+
+    return {
+      ...job,
+      freelancerInfo,
+      proposalCount
+    };
+  });
 
   return {
     jobs: enhancedJobs,
@@ -150,6 +156,7 @@ export const getClientCompletedJobs = async (clientId, page = 1, limit = 100, bu
       { clientId: clientId.toString() }
     ],
     isDraft: { $ne: true },
+    isDeleted: { $ne: true },
     status: "completed"
   };
 
@@ -164,6 +171,7 @@ export const getClientCompletedJobs = async (clientId, page = 1, limit = 100, bu
       { clientId: clientId.toString() }
     ],
     isDraft: { $ne: true },
+    isDeleted: { $ne: true },
     status: { $in: ["open", "in-progress", "in progress", "completed"] }
   };
 
@@ -200,55 +208,53 @@ export const getClientCompletedJobs = async (clientId, page = 1, limit = 100, bu
     db.collection(COLLECTIONS.JOBS).countDocuments(totalQuery)
   ]);
 
-  // Enhance with freelancer info and reviews
-  const enhancedJobs = await Promise.all(
-    jobs.map(async (job) => {
-      let freelancerInfo = null;
+  // Bulk enhance with freelancer info and reviews
+  const freelancerIds = jobs.map(j => toObjectId(j.freelancerId)).filter(Boolean);
 
-      if (job.freelancerId) {
-        const freelancerId = toObjectId(job.freelancerId);
-        const freelancer = await db.collection(COLLECTIONS.USERS).findOne({
-          $or: [
-            { _id: freelancerId },
-            { _id: job.freelancerId.toString() }
-          ]
-        });
+  let freelancersMap = {};
+  if (freelancerIds.length > 0) {
+    const [freelancers, profiles] = await Promise.all([
+      db.collection(COLLECTIONS.USERS).find({ _id: { $in: freelancerIds } }).toArray(),
+      db.collection(COLLECTIONS.PROFILES).find({ userId: { $in: freelancerIds } }).toArray()
+    ]);
 
-        if (freelancer) {
-          const profile = await db.collection(COLLECTIONS.PROFILES).findOne({
-            $or: [
-              { userId: freelancerId },
-              { userId: job.freelancerId.toString() }
-            ]
-          });
+    const profilesMap = {};
+    profiles.forEach(p => {
+      profilesMap[p.userId.toString()] = p;
+    });
 
-          freelancerInfo = {
-            _id: freelancer._id,
-            name: freelancer.name,
-            email: freelancer.email,
-            image: freelancer.image,
-            rating: freelancer.rating || 0,
-            hourlyRate: profile?.hourlyRate || 0,
-            completedJobs: profile?.completedJobs || 0,
-            location: profile?.location || freelancer.location || "Unknown"
-          };
-        }
-      }
-
-      // Calculate duration
-      const duration = job.completedAt && job.createdAt
-        ? Math.ceil((new Date(job.completedAt) - new Date(job.createdAt)) / (1000 * 60 * 60 * 24))
-        : null;
-
-      return {
-        ...job,
-        freelancerInfo,
-        durationInDays: duration,
-        clientReview: job.clientReview || null,
-        freelancerReview: job.freelancerReview || null
+    freelancers.forEach(f => {
+      const profile = profilesMap[f._id.toString()];
+      freelancersMap[f._id.toString()] = {
+        _id: f._id,
+        name: f.name,
+        email: f.email,
+        image: f.image,
+        rating: f.rating || 0,
+        hourlyRate: profile?.hourlyRate || 0,
+        completedJobs: profile?.completedJobs || 0,
+        location: profile?.location || f.location || "Unknown"
       };
-    })
-  );
+    });
+  }
+
+  const enhancedJobs = jobs.map((job) => {
+    const fid = job.freelancerId ? job.freelancerId.toString() : null;
+    const freelancerInfo = fid ? (freelancersMap[fid] || null) : null;
+
+    // Calculate duration
+    const duration = job.completedAt && job.createdAt
+      ? Math.ceil((new Date(job.completedAt) - new Date(job.createdAt)) / (1000 * 60 * 60 * 24))
+      : null;
+
+    return {
+      ...job,
+      freelancerInfo,
+      durationInDays: duration,
+      clientReview: job.clientReview || null,
+      freelancerReview: job.freelancerReview || null
+    };
+  });
 
   return {
     jobs: enhancedJobs,

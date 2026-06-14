@@ -218,6 +218,7 @@ import React, { useEffect, useState } from 'react';
 import Icon from '@/components/ui/AppIcon';
 import { useRouter } from 'next/navigation';
 import { useSession } from "next-auth/react";
+import { formatClientInitials } from '@/utils/avatarColors';
 
 interface SearchResult {
     id: string;
@@ -242,6 +243,7 @@ interface SearchResult {
     clientName?: string;
     clientInitials?: string;
     clientRating?: number;
+    currency?: string;
 }
 
 interface JobForProposal {
@@ -250,12 +252,12 @@ interface JobForProposal {
     budget: string;
     level: string;
     description: string;
-
     clientName?: string;
     clientInitials?: string;
     bids?: number;
     rating?: number;
     averageBid?: string;
+    currency?: string;
 }
 
 interface ProjectDetailsPanelProps {
@@ -305,25 +307,11 @@ const ProjectDetailsPanel = ({ result, onClose, onApply }: ProjectDetailsPanelPr
                     level: result.tags[1] || 'Intermediate',
                     description: result.description,
                     clientName: result.clientName,
-
                     clientInitials: clientInitials,
                     bids: result.bids,
                     rating: result.rating,
-                    averageBid: result.averageBid
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                    averageBid: result.averageBid,
+                    currency: result.currency,
                 });
                 onClose();
             }
@@ -366,9 +354,12 @@ const ProjectDetailsPanel = ({ result, onClose, onApply }: ProjectDetailsPanelPr
                         <div>
                             <div className="flex items-center gap-3 mb-2">
                                 <h2 className="text-2xl font-display font-bold text-foreground">{result.title}</h2>
-                                {result.featured && (
-                                    <Icon name="StarIcon" size={20} variant="solid" className="text-yellow-500 flex-shrink-0" />
-                                )}
+                                 {result.featured && (
+                                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-50 text-amber-600 border border-amber-200 shadow-sm flex-shrink-0">
+                                         <Icon name="StarIcon" size={12} variant="solid" className="text-amber-500" />
+                                         Featured
+                                     </span>
+                                 )}
                             </div>
                             <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                 {result.postedAt && <span>Posted {result.postedAt}</span>}
@@ -435,7 +426,7 @@ const ProjectDetailsPanel = ({ result, onClose, onApply }: ProjectDetailsPanelPr
                                     {clientInitials}
                                 </div>
                                 <div>
-                                    <p className="font-semibold text-foreground">{clientName}</p>
+                                    <p className="font-semibold text-foreground">{formatClientInitials(clientName)}</p>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                                         <Icon name="StarIcon" size={14} className="text-warning" variant="solid" />
                                         <span>

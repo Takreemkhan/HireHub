@@ -1,5 +1,6 @@
 import clientPromise, { DB_NAME, COLLECTIONS } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { notifyNewProposal } from "@/services/notificationService";
 
 /* SUBMIT PROPOSAL (Freelancer bids on a job) */
 export const submitProposal = async (proposalData) => {
@@ -111,6 +112,20 @@ export const submitProposal = async (proposalData) => {
     }
   );
 
+  // Send platform notification to client
+  try {
+    await notifyNewProposal({
+      recipientId: job.clientId,
+      senderId: freelancerId,
+      freelancerName: freelancer?.name || "A freelancer",
+      jobTitle: job.title,
+      jobId: job._id.toString(),
+      proposalId: result.insertedId.toString()
+    });
+  } catch (notiError) {
+    console.error("Failed to send platform notification for proposal:", notiError);
+  }
+
   return { ...proposal, _id: result.insertedId };
 };
 
@@ -175,34 +190,36 @@ export const getProposalsForJob = async (jobId, clientId, filters = {}, freelanc
     .skip(skip)
     .limit(limit)
     .toArray();
-  const proposals = await Promise.all(
-    proposalsRaw.map(async (proposal) => {
-      if (!proposal.resumeID) {
-        return { ...proposal, resumeVideos: [] };
-      }
+  const resumeIds = proposalsRaw.map(p => {
+    if (!p.resumeID) return null;
+    try {
+      return typeof p.resumeID === "string" ? new ObjectId(p.resumeID) : p.resumeID;
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
 
-      try {
-        const resumeId =
-          typeof proposal.resumeID === "string"
-            ? new ObjectId(proposal.resumeID)
-            : proposal.resumeID;
+  let resumesMap = {};
+  if (resumeIds.length > 0) {
+    const resumes = await db.collection(COLLECTIONS.RESUME_VIDEOS).find({
+      _id: { $in: resumeIds }
+    }).toArray();
+    resumes.forEach(r => {
+      resumesMap[r._id.toString()] = r.videos || [];
+    });
+  }
 
-        const resume = await db.collection(COLLECTIONS.RESUME_VIDEOS).findOne({
-          _id: resumeId
-        });
-
-        return {
-          ...proposal,
-          resumeVideos: resume?.videos || []
-        };
-      } catch (err) {
-        return {
-          ...proposal,
-          resumeVideos: []
-        };
-      }
-    })
-  );
+  const proposals = proposalsRaw.map((proposal) => {
+    if (!proposal.resumeID) {
+      return { ...proposal, resumeVideos: [] };
+    }
+    const ridStr = proposal.resumeID.toString();
+    const resumeVideos = resumesMap[ridStr] || [];
+    return {
+      ...proposal,
+      resumeVideos
+    };
+  });
   const total = await db.collection(COLLECTIONS.PROPOSALS).countDocuments(query);
 
   // Global stats for the job (ignoring freelancerId filter)

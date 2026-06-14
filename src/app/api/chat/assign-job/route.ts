@@ -47,7 +47,7 @@ export async function GET(req: Request) {
         if (chat.assignedJob?.jobId) {
             const job = await db.collection(COLLECTIONS.JOBS).findOne(
                 { _id: new ObjectId(chat.assignedJob.jobId) },
-                { projection: { title: 1, _id: 1, status: 1, currency: 1, paymentStatus: 1, clientId: 1 } }
+                { projection: { title: 1, _id: 1, status: 1, currency: 1, paymentStatus: 1, clientId: 1, budget: 1 } }
             );
             if (job) {
                 const paymentInfo = await db.collection(COLLECTIONS.PAYMENTS).findOne({ jobId: job._id });
@@ -58,9 +58,31 @@ export async function GET(req: Request) {
                         jobTitle: job.title,
                         jobStatus: job.status,
                         jobCurrency: job.currency || "USD",
+                        jobBudget: job.budget,
                         paymentStatus: paymentInfo?.paymentStatus || job.paymentStatus,
                         clientId: job.clientId?.toString() || null,
                         assigned: true
+                    }
+                });
+            }
+        } else if (chat.jobId) {
+            const job = await db.collection(COLLECTIONS.JOBS).findOne(
+                { _id: new ObjectId(chat.jobId) },
+                { projection: { title: 1, _id: 1, status: 1, currency: 1, paymentStatus: 1, clientId: 1, budget: 1 } }
+            );
+            if (job) {
+                const paymentInfo = await db.collection(COLLECTIONS.PAYMENTS).findOne({ jobId: job._id });
+                return NextResponse.json({
+                    assigned: false,
+                    pinnedJob: {
+                        jobId: job._id.toString(),
+                        jobTitle: job.title,
+                        jobStatus: job.status,
+                        jobCurrency: job.currency || "USD",
+                        jobBudget: job.budget,
+                        paymentStatus: paymentInfo?.paymentStatus || job.paymentStatus,
+                        clientId: job.clientId?.toString() || null,
+                        assigned: false
                     }
                 });
             }
@@ -89,7 +111,7 @@ export async function GET(req: Request) {
             if (activeProposal) {
                 const job = await db.collection(COLLECTIONS.JOBS).findOne(
                     { _id: activeProposal.jobId },
-                    { projection: { title: 1, _id: 1, currency: 1, paymentStatus: 1, clientId: 1 } }
+                    { projection: { title: 1, _id: 1, currency: 1, paymentStatus: 1, clientId: 1, budget: 1 } }
                 );
                 if (job) {
                     const paymentInfo = await db.collection(COLLECTIONS.PAYMENTS).findOne({ jobId: job._id });
@@ -99,6 +121,7 @@ export async function GET(req: Request) {
                             jobId: job._id.toString(),
                             jobTitle: job.title,
                             jobCurrency: job.currency || "USD",
+                            jobBudget: job.budget,
                             paymentStatus: paymentInfo?.paymentStatus || job.paymentStatus,
                             clientId: job.clientId?.toString() || null,
                             assigned: false

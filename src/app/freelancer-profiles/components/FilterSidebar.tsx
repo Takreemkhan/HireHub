@@ -349,11 +349,35 @@ const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
   const { data: dataCategories } = useFreelancerCategories();
 
   const categories = React.useMemo(() => {
-    return dataCategories?.categories || [];
+    const items = dataCategories?.categories || [];
+    const map = new Map<string, any>();
+    items.forEach((item: any) => {
+      const key = item.label?.toLowerCase()?.trim();
+      if (!key) return;
+      if (map.has(key)) {
+        map.get(key).count += (item.count || 0);
+      } else {
+        // Keep original label casing of the first encountered item
+        map.set(key, { ...item, count: item.count || 0 });
+      }
+    });
+    return Array.from(map.values());
   }, [dataCategories]);
 
   const dynamicTopSkills = React.useMemo(() => {
-    return dataCategories?.topSkills || [];
+    const items = dataCategories?.topSkills || [];
+    const map = new Map<string, any>();
+    items.forEach((item: any) => {
+      // Remove all non-alphanumeric characters for grouping so "node js" and "Node.js" map to "nodejs"
+      const key = item.label?.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!key) return;
+      if (map.has(key)) {
+        map.get(key).count += (item.count || 0);
+      } else {
+        map.set(key, { ...item, count: item.count || 0 });
+      }
+    });
+    return Array.from(map.values());
   }, [dataCategories]);
 
 
@@ -424,38 +448,7 @@ const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
 
       <div className={`space-y-6 ${!isExpanded ? 'hidden lg:block' : ''}`}>
 
-        {/* ── Categories ─────────────────────────────────────────────────────── */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-display font-semibold text-foreground">Categories</h3>
-            {filters.categories.length > 0 && (
-              <span className="text-xs text-primary font-medium">{filters.categories.length} selected</span>
-            )}
-          </div>
-          <div className="space-y-2">
-            {dataCategories?.categories?.map((cat: any) => (
 
-              <label
-                key={cat.id}
-                className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={filters.categories.includes(cat.label)}
-                    onChange={() => toggle('categories', cat.label)}
-                    disabled={!isHydrated}
-                    className="w-4 h-4 text-primary border-border rounded focus:ring-2 focus:ring-primary disabled:opacity-50"
-                  />
-                  <span className="text-sm text-foreground">{cat.label}</span>
-                </div>
-                {filters.categories.includes(cat.label) && (
-                  <span className="text-xs text-muted-foreground">{cat.count}</span>
-                )}
-              </label>
-            ))}
-          </div>
-        </div>
 
         {/* ── Skills ─────────────────────────────────────────────────────────── */}
         <div className="pt-6 border-t border-border">
@@ -474,14 +467,14 @@ const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    checked={filters.skills.includes(skill.id)}
-                    onChange={() => toggle('skills', skill.id)}
+                    checked={filters.skills.includes(skill.label)}
+                    onChange={() => toggle('skills', skill.label)}
                     disabled={!isHydrated}
                     className="w-4 h-4 text-primary border-border rounded focus:ring-2 focus:ring-primary disabled:opacity-50"
                   />
                   <span className="text-sm text-foreground">{skill.label}</span>
                 </div>
-                {filters.skills.includes(skill.id) && (
+                {filters.skills.includes(skill.label) && (
                   <span className="text-xs text-muted-foreground">{skill.count}</span>
                 )}
               </label>

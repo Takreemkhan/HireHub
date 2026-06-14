@@ -1134,6 +1134,7 @@ function PostJobContent() {
     const rzp = new (window as any).Razorpay(options);
     rzp.open();
   };
+  const [actionTriggered, setActionTriggered] = useState(false);
   const [error, setError] = useState("");
   const [isCustomSubcategory, setIsCustomSubcategory] = useState(false);
   const [isFeatured, setIsFeatured] = useState(false);
@@ -1421,6 +1422,60 @@ function PostJobContent() {
       setLoading(false);
     }
   };
+
+  // Restore form state from localStorage preview if matching
+  useEffect(() => {
+    const stored = localStorage.getItem("previewJob");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed) {
+          const isSameDraft = (!draftId && parsed.id === "preview") || (draftId && String(parsed.id) === String(draftId));
+          if (isSameDraft) {
+            setFormData({
+              title: parsed.title || "",
+              description: parsed.description || "",
+              category: parsed.category || "",
+              subcategory: parsed.subcategory || "",
+              budget: parsed.budget || "",
+              budgetType: parsed.budgetType || "Fixed",
+              currency: parsed.currency || "USD",
+              visibility: parsed.visibility || "public",
+              questions: parsed.questions || [""],
+              projectDuration: parsed.projectDuration || "",
+            });
+            if (parsed.category === "Other") setIsCustomSubcategory(true);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to restore form state from previewJob", e);
+      }
+      // If we are not performing an action, clear it now
+      const action = searchParams.get("action");
+      if (!action) {
+        localStorage.removeItem("previewJob");
+      }
+    }
+  }, [draftId, searchParams]);
+
+  // Execute preview actions (publish or save) on mount
+  useEffect(() => {
+    const action = searchParams.get("action");
+    if (!action || actionTriggered) return;
+
+    if (draftId && isDraftLoading) return;
+
+    if (!formData.title) return;
+
+    setActionTriggered(true);
+    localStorage.removeItem("previewJob");
+
+    if (action === "publish") {
+      handlePostJob();
+    } else if (action === "save") {
+      handleSaveDraft();
+    }
+  }, [searchParams, formData, draftId, isDraftLoading, actionTriggered]);
 
   const currencySymbol = formData.currency === 'USD' ? '$' : formData.currency === 'GBP' ? '£' : formData.currency === 'EUR' ? '€' : '₹';
 
@@ -1976,7 +2031,7 @@ function PostJobContent() {
                 />
                 <div>
                   <p className="font-semibold text-gray-900">Pay Later</p>
-                  <p className="text-sm text-gray-500 mt-0.5">Post the job now with $0 due (except featured fee, if selected). Fund the escrow only when you are ready to assign a freelancer.</p>
+                  <p className="text-sm text-gray-500 mt-0.5">Post the job now with {currencySymbol}0 due (except featured fee, if selected). Fund the escrow only when you are ready to assign a freelancer.</p>
                 </div>
               </label>
             </div>

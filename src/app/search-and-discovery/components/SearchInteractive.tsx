@@ -12,6 +12,7 @@ import SortOptions from './SortOptions';
 import SavedJobsPanel from './SavedJobsPanel';
 import Icon from '@/components/ui/AppIcon';
 import SubmitProposalModal, { type JobForProposal } from '@/app/freelancer-dashboard/components/SubmitProposalModal';
+import { getCurrencySymbol } from "@/utils/currency";
 
 interface FilterCategory {
   id: string;
@@ -43,6 +44,7 @@ interface SearchResult {
   clientName?: string;
   clientInitials?: string;
   clientRating?: number;
+  currency?: string;
 }
 
 interface SavedJobItem {
@@ -92,9 +94,10 @@ function timeAgo(dateString: string): string {
   return `${years} year${years !== 1 ? 's' : ''} ago`;
 }
 
-function formatBudget(budget: number): string {
+function formatBudget(budget: number, currencyCode?: string): string {
   if (!budget) return 'Not specified';
-  return `£${budget.toLocaleString()}`;
+  const symbol = getCurrencySymbol(currencyCode || 'GBP');
+  return `${symbol}${budget.toLocaleString()}`;
 }
 
 function getClientInfo(apiJob: any): { fullName: string; initials: string } {
@@ -124,18 +127,19 @@ function mapJobToSearchResult(apiJob: any): SearchResult {
     rating: apiJob.clientInfo?.rating ?? 0,
     reviewCount: 0,
     tags: [apiJob.category, apiJob.subCategory].filter(Boolean),
-    price: formatBudget(apiJob.budget),
+    price: formatBudget(apiJob.budget, apiJob.currency),
     location: 'Remote',
     availability: apiJob.jobVisibility === 'private' ? 'Invited only' : 'Open',
-    featured: false,
+    featured: isFeaturedActive(apiJob),
     bids: apiJob.proposalCount ?? 0,
     averageBid: undefined,
-    budget: formatBudget(apiJob.budget),
+    budget: formatBudget(apiJob.budget, apiJob.currency),
     isNew: isJobNew(apiJob.createdAt),
     postedAt: timeAgo(apiJob.createdAt),
     clientName: fullName,
     clientInitials: initials,
     clientRating: apiJob.clientInfo?.rating ?? 0,
+    currency: apiJob.currency || "USD",
   };
 }
 
@@ -145,7 +149,7 @@ function mapJobToSavedItem(apiJob: any): SavedJobItem {
   return {
     id: apiJob._id,
     title: apiJob.title,
-    budget: formatBudget(apiJob.budget),
+    budget: formatBudget(apiJob.budget, apiJob.currency),
     category: apiJob.category || '',
     postedAt: apiJob.createdAt ? timeAgo(apiJob.createdAt) : '',
     clientName: fullName,
@@ -157,6 +161,17 @@ function mapJobToSavedItem(apiJob: any): SavedJobItem {
 function isJobNew(createdAt: string): boolean {
   const hoursSincePosted = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60);
   return hoursSincePosted < 24;
+}
+
+/**
+ * Returns true only if the job's featured window is still active.
+ * A featured job is active when isFeatured=true AND featuredUntil is in the future.
+ * This prevents permanently-flagged old jobs from still showing the Featured badge.
+ */
+function isFeaturedActive(apiJob: any): boolean {
+  if (!apiJob.isFeatured) return false;
+  if (!apiJob.featuredUntil) return false;
+  return new Date(apiJob.featuredUntil).getTime() > Date.now();
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────

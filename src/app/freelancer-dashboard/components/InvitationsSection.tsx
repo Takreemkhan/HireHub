@@ -13,6 +13,7 @@ import {
   Calendar,
   User,
 } from "lucide-react";
+import { formatClientInitials } from "@/utils/avatarColors";
 
 const mockInvitations = [
   {
@@ -173,7 +174,7 @@ export default function InvitationsSection() {
                 {invitation.clientInitials}
               </div>
               <div>
-                <p className="font-semibold text-gray-900 text-sm">{invitation.clientName}</p>
+                <p className="font-semibold text-gray-900 text-sm">{formatClientInitials(invitation.clientName)}</p>
                 <div className="flex items-center gap-1.5 text-xs text-gray-500">
                   <MapPin size={11} />
                   {invitation.clientLocation}

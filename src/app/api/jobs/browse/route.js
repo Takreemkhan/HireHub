@@ -3,46 +3,40 @@ import {
   getAllJobsForFreelancer,
   getFeaturedJobs,
   getJobCategories,
-  getJobById
 } from "@/app/controllers/job.controller";
-//import { verifyAuth } from "@/lib/auth.middleware";
+import { getOrSetCache } from "@/lib/redis";
 
 /* GET - Browse all jobs (Freelancer side) */
 export async function GET(req) {
   try {
-    // Authentication optional for browsing
-   // const auth = await verifyAuth(req);
-
     const { searchParams } = new URL(req.url);
 
-   
+    // ── Categories (cached 10 min — rarely changes) ──────────────────────────
     if (searchParams.get("categories") === "true") {
-      const categories = await getJobCategories();
-      return NextResponse.json(
-        {
-          success: true,
-          categories
-        },
-        { status: 200 }
+      const categories = await getOrSetCache(
+        "api:jobs:categories",
+        () => getJobCategories(),
+        600 // 10 minutes
       );
+      const response = NextResponse.json({ success: true, categories }, { status: 200 });
+      response.headers.set("Cache-Control", "public, s-maxage=600, stale-while-revalidate=3600");
+      return response;
     }
 
-    // Get featured jobs (last 24 hours)
+    // ── Featured jobs (cached 60s — active within 24h window) ────────────────
     if (searchParams.get("featured") === "true") {
       const limit = Number(searchParams.get("limit")) || 10;
-      const jobs = await getFeaturedJobs(limit);
-      
-      return NextResponse.json(
-        {
-          success: true,
-          jobs,
-          total: jobs.length
-        },
-        { status: 200 }
+      const jobs = await getOrSetCache(
+        `api:jobs:featured:${limit}`,
+        () => getFeaturedJobs(limit),
+        60 // 60 seconds
       );
+      const response = NextResponse.json({ success: true, jobs, total: jobs.length }, { status: 200 });
+      response.headers.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=120");
+      return response;
     }
 
-    // Get all jobs with filters
+    // ── All jobs with filters (cached 60s per unique filter combination) ─────
     const filters = {
       category: searchParams.get("category"),
       subCategory: searchParams.get("subCategory"),
@@ -50,34 +44,30 @@ export async function GET(req) {
       maxBudget: searchParams.get("maxBudget"),
       projectDuration: searchParams.get("projectDuration"),
       search: searchParams.get("search"),
-      sortBy: searchParams.get("sortBy") || "recent", 
+      sortBy: searchParams.get("sortBy") || "recent",
       page: searchParams.get("page") || 1,
-      limit: searchParams.get("limit") || 20
+      limit: searchParams.get("limit") || 20,
     };
 
-    const result = await getAllJobsForFreelancer(filters);
+    // Build a stable cache key from the filter params
+    const cacheKey = `api:jobs:browse:${searchParams.toString()}`;
 
-    return NextResponse.json(
-      {
-        success: true,
-        ...result
-      },
-      { status: 200 }
+    const result = await getOrSetCache(
+      cacheKey,
+      () => getAllJobsForFreelancer(filters),
+      60 // 60 seconds — short enough to reflect new posts quickly
     );
+
+    const response = NextResponse.json({ success: true, ...result }, { status: 200 });
+    // Allow CDNs to cache public job listings for 60s
+    response.headers.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=120");
+    return response;
 
   } catch (error) {
     console.error("Jobs Browse GET error:", error);
     return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to fetch jobs",
-        error: error.message
-      },
+      { success: false, message: "Failed to fetch jobs", error: error.message },
       { status: 500 }
     );
   }
 }
-
-
-
-

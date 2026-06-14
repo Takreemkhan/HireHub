@@ -48,3 +48,12 @@ export function getInitials(email: string): string {
   
   return username.charAt(0).toUpperCase();
 }
+
+export function formatClientInitials(name: string): string {
+  if (!name) return "";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length > 1) {
+    return `${parts[0].charAt(0).toUpperCase()}.${parts[parts.length - 1].charAt(0).toUpperCase()}.`;
+  }
+  return parts[0] ? `${parts[0].charAt(0).toUpperCase()}.` : "";
+}

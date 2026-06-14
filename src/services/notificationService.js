@@ -154,3 +154,15 @@ export const notifyReview = ({ recipientId, senderId, clientName, jobTitle, jobI
         meta: { jobId, jobTitle },
         link: `/freelancer-dashboard?tab=overview`,
     });
+
+
+export const notifyNewProposal = ({ recipientId, senderId, freelancerName, jobTitle, jobId, proposalId }) =>
+    createNotification({
+        recipientId,
+        senderId,
+        type: "proposal_update",
+        title: "New Proposal Submitted",
+        body: `${freelancerName} submitted a proposal for: "${jobTitle}"`,
+        meta: { jobId, jobTitle, proposalId },
+        link: `/client-dashboard/current-jobs/${jobId}`,
+    });

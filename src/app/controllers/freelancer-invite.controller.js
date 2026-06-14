@@ -1,6 +1,7 @@
 import clientPromise, { DB_NAME, COLLECTIONS } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import nodemailer from "nodemailer";
+import { notifyJobInvite } from "@/services/notificationService";
 
 
 /*  FREELANCER INVITE SYSTEM (Private Jobs)    */
@@ -208,6 +209,21 @@ export const inviteFreelancers = async (jobId, clientId, invites) => {
 
             // Save invite
             const inviteResult = await db.collection(COLLECTIONS.JOB_INVITES).insertOne(inviteData);
+
+            // Send platform notification if freelancer is registered
+            if (freelancer) {
+                try {
+                    await notifyJobInvite({
+                        recipientId: freelancer._id,
+                        senderId: clientId,
+                        clientName: clientUser.name || "A client",
+                        jobId: job._id,
+                        jobTitle: job.title
+                    });
+                } catch (notiError) {
+                    console.error("Failed to send platform notification for invite:", notiError);
+                }
+            }
 
             // Send email
             try {

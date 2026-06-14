@@ -49,6 +49,8 @@ async function createIndexes() {
     await db.collection("jobs").createIndex({ freelancerId: 1 });
     await db.collection("jobs").createIndex({ status: 1 });
     await db.collection("jobs").createIndex({ createdAt: -1 });
+    await db.collection("jobs").createIndex({ isDeleted: 1 });
+    await db.collection("jobs").createIndex({ isDraft: 1 });
 
     // Proposals indexes
     await db.collection("proposals").createIndex({ jobId: 1 });

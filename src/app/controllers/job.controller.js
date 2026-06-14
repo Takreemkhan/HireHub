@@ -18,7 +18,7 @@ export const getAllJobs = async () => {
   const db = client.db(DB_NAME);
 
   return await db.collection(COLLECTIONS.JOBS)
-    .find()
+    .find({ isDeleted: { $ne: true } })
     .sort({ createdAt: -1 })
     .toArray();
 };
@@ -29,7 +29,7 @@ export const getJobById = async (jobId) => {
   const db = client.db(DB_NAME);
 
   return await db.collection(COLLECTIONS.JOBS)
-    .findOne({ _id: new ObjectId(jobId) });
+    .findOne({ _id: new ObjectId(jobId), isDeleted: { $ne: true } });
 };
 
 // UPDATE JOB 
@@ -49,15 +49,20 @@ export const updateJobById = async (jobId, updateData) => {
   return result.value;
 };
 
-// DELETE JOB 
+// DELETE JOB (Soft Delete)
 export const deleteJobById = async (jobId) => {
   const client = await clientPromise;
   const db = client.db(DB_NAME);
 
   const result = await db.collection(COLLECTIONS.JOBS)
-    .deleteOne({ _id: new ObjectId(jobId) });
+    .findOneAndUpdate(
+      { _id: new ObjectId(jobId) },
+      { $set: { isDeleted: true, updatedAt: new Date() } },
+      { returnDocument: "after" }
+    );
 
-  return result.deletedCount > 0;
+  const doc = result && (result.value !== undefined ? result.value : result);
+  return !!doc;
 };
 
 
@@ -76,7 +81,8 @@ export const getAllJobsForFreelancer = async (filters = {}) => {
   // Step 1: Match filter banao (same as before)
   const matchQuery = {
     status: "open",
-    jobVisibility: "public"
+    jobVisibility: "public",
+    isDeleted: { $ne: true }
   };
 
   if (filters.category) matchQuery.category = filters.category;
@@ -111,6 +117,16 @@ export const getAllJobsForFreelancer = async (filters = {}) => {
   const limit = Number(filters.limit) || 20;
   const skip = (page - 1) * limit;
 
+  // Step 4a: Build the final sort object.
+  // Featured-active jobs always sort newest-first among themselves (per spec).
+  // Among non-featured jobs, the user's chosen sortBy option applies.
+  // If the user chose a sort that already includes createdAt (e.g. "recent"),
+  // we use it directly; otherwise we prepend createdAt for the featured tier.
+  const featuredSort = Object.keys(sortOptions).includes('createdAt')
+    ? sortOptions
+    : { createdAt: -1, ...sortOptions };
+  const finalSort = { _featuredActive: -1, ...featuredSort };
+
   // Step 4: EK hi aggregation query mein sab kuch
   // Pehle: 1 job fetch + 1 user fetch + 1 proposal count = 3 queries PER JOB (20 jobs = 60 queries)
   // Ab:    Sab kuch ek pipeline mein = sirf 1 query total
@@ -129,8 +145,7 @@ export const getAllJobsForFreelancer = async (filters = {}) => {
       }
     },
 
-    // Featured jobs first, then by chosen sort
-    { $sort: { _featuredActive: -1, ...sortOptions } },
+    { $sort: finalSort },
 
     // Total count ke liye facet use karo (pagination + data dono ek saath)
     {
@@ -264,7 +279,8 @@ export const getFeaturedJobs = async (limit = 10) => {
       status: "open",
       jobVisibility: "public",
       isFeatured: true,
-      featuredUntil: { $gte: now }
+      featuredUntil: { $gte: now },
+      isDeleted: { $ne: true }
     })
     .sort({ featuredUntil: 1 }) // soonest-expiring first
     .limit(limit)
@@ -279,7 +295,7 @@ export const getJobCategories = async () => {
   const db = client.db(DB_NAME);
 
   const categories = await db.collection(COLLECTIONS.JOBS).aggregate([
-    { $match: { status: "open", jobVisibility: "public" } },
+    { $match: { status: "open", jobVisibility: "public", isDeleted: { $ne: true } } },
     {
       $group: {
         _id: "$category",

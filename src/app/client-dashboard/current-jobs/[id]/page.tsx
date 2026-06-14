@@ -1057,6 +1057,7 @@ import Header from "@/components/common/Header";
 import FooterSection from "@/app/homepage/components/FooterSection";
 import { useclientSendMessage } from "@/app/hook/useProfile";
 import { useProposalChat } from "@/app/hook/useProposalChat";
+import { getCurrencySymbol } from "@/utils/currency";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -1075,6 +1076,7 @@ interface JobData {
   jobVisibility: string;
   projectDuration: string;
   freelancerSource: string;
+  currency?: string;
 }
 
 interface Proposal {
@@ -1131,9 +1133,10 @@ function timeAgo(dateString: string): string {
   return `${years} year${years !== 1 ? 's' : ''} ago`;
 }
 
-function formatBudget(budget: number): string {
+function formatBudget(budget: number, currencyCode?: string): string {
   if (!budget) return "Not specified";
-  return `£${budget.toLocaleString()}`;
+  const symbol = getCurrencySymbol(currencyCode || "GBP");
+  return `${symbol}${budget.toLocaleString()}`;
 }
 
 function mapApiToJob(apiJob: any): JobData {
@@ -1142,7 +1145,7 @@ function mapApiToJob(apiJob: any): JobData {
     title: apiJob.title,
     postedTime: apiJob.createdAt ? timeAgo(apiJob.createdAt) : "Recently",
     jobId: `#${apiJob._id.slice(-7).toUpperCase()}`,
-    budget: formatBudget(apiJob.budget),
+    budget: formatBudget(apiJob.budget, apiJob.currency),
     projectType: apiJob.freelancerSource === "invited" ? "Private Project" : "Fixed Price Project",
     category: [apiJob.category, apiJob.subCategory].filter(Boolean).join(" >> "),
     status: apiJob.status === "open" ? "Active" : apiJob.status,
@@ -1152,6 +1155,7 @@ function mapApiToJob(apiJob: any): JobData {
     jobVisibility: apiJob.jobVisibility || "public",
     projectDuration: apiJob.projectDuration || "",
     freelancerSource: apiJob.freelancerSource || "any",
+    currency: apiJob.currency || "USD",
   };
 }
 
@@ -1864,7 +1868,7 @@ export default function CurrentJobDetailPage() {
                       placeholder="Describe the job" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Budget (£) *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Budget ({getCurrencySymbol(job?.currency || "GBP")}) *</label>
                     <input type="number" min="1" value={editForm.budget}
                       onChange={(e) => setEditForm((f) => ({ ...f, budget: e.target.value }))}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
@@ -2092,7 +2096,7 @@ export default function CurrentJobDetailPage() {
 
                               <div className="lg:col-span-1 border-l border-gray-200 pl-6">
                                 <p className="text-xs font-semibold text-gray-500 uppercase mb-4">Proposed Amount</p>
-                                <p className="text-2xl font-bold text-gray-900 mb-2 break-words">£{proposal.bidAmount?.toLocaleString()}</p>
+                                <p className="text-2xl font-bold text-gray-900 mb-2 break-words">{getCurrencySymbol(job?.currency || "GBP")}{proposal.bidAmount?.toLocaleString()}</p>
                                 {/* <p className="text-xs text-gray-500">Submitted {timeAgo(proposal.createdAt)}</p>
                                 <div className="mt-4 pt-4 border-t border-gray-100">
                                   <p className="text-xs text-gray-500">Status</p>
@@ -2356,7 +2360,7 @@ export default function CurrentJobDetailPage() {
             <div className="px-6 py-3 bg-orange-50 border-b border-orange-100 flex-shrink-0">
               <p className="text-sm text-gray-700">
                 <span className="font-semibold text-orange-600">Proposed Amount:</span>{" "}
-                <span className="text-xl font-bold text-gray-900">£{selectedProposal.bidAmount?.toLocaleString()}</span>
+                <span className="text-xl font-bold text-gray-900">{getCurrencySymbol(job?.currency || "GBP")}{selectedProposal.bidAmount?.toLocaleString()}</span>
               </p>
               <p className="text-xs text-gray-400 mt-0.5">Submitted {timeAgo(selectedProposal.createdAt)}</p>
             </div>
@@ -2418,22 +2422,17 @@ export default function CurrentJobDetailPage() {
                   Shortlist
                 </button>
               ) : (
-                <>
-                  <button className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition-colors">
-                    Accept & Hire
-                  </button>
-                  <button
-                    onClick={() => handleOpenChat(selectedProposal)}
-                    disabled={messagingProposalId === selectedProposal._id}
-                    className="flex-1 px-4 py-2.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {messagingProposalId === selectedProposal._id ? (
-                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Opening...</>
-                    ) : (
-                      "Message"
-                    )}
-                  </button>
-                </>
+                <button
+                  onClick={() => handleOpenChat(selectedProposal)}
+                  disabled={messagingProposalId === selectedProposal._id}
+                  className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {messagingProposalId === selectedProposal._id ? (
+                    <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Opening...</>
+                  ) : (
+                    "Message"
+                  )}
+                </button>
               )}
               <button
                 onClick={() => { handleReject(selectedProposal._id); setSelectedProposal(null); }}

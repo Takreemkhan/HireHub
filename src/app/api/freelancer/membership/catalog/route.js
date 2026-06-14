@@ -10,7 +10,7 @@ export async function GET(req) {
         const client = await clientPromise;
         const db = client.db(DB_NAME);
 
-        const bidPacks = await db.collection(COLLECTIONS.BIDS).find({}).sort({ amountINR: 1 }).toArray();
+        const bidPacks = await db.collection(COLLECTIONS.BIDS).find({ packKey: { $exists: true } }).sort({ amountINR: 1 }).toArray();
 
         return NextResponse.json({
             success: true,

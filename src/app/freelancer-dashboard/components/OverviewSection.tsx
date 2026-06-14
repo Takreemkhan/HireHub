@@ -194,10 +194,12 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import SubmitProposalModal, { type JobForProposal } from "./SubmitProposalModal";
+import { getCurrencySymbol } from "@/utils/currency";
 
-function formatBudget(budget: number | undefined): string {
+function formatBudget(budget: number | undefined, currencyCode?: string): string {
   if (budget == null) return 'Not specified';
-  return `£${Number(budget).toLocaleString()}`;
+  const symbol = getCurrencySymbol(currencyCode || 'GBP');
+  return `${symbol}${Number(budget).toLocaleString()}`;
 }
 
 function mapApiJobToCard(apiJob: {
@@ -207,13 +209,15 @@ function mapApiJobToCard(apiJob: {
   category?: string;
   subCategory?: string;
   experienceLevel?: string;
+  currency?: string;
 }): JobForProposal {
   const level = apiJob.experienceLevel || apiJob.subCategory || 'Intermediate';
   return {
     id: apiJob._id,
     title: apiJob.title,
-    budget: formatBudget(apiJob.budget),
+    budget: formatBudget(apiJob.budget, apiJob.currency),
     level,
+    currency: apiJob.currency,
   };
 }
 

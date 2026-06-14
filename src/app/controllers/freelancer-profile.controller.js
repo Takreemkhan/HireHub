@@ -84,7 +84,7 @@ export const getFreelancerProfile = async (userId) => {
       freelancerId: userObjectId,
       status: "in-progress"
     }, {
-      projection: { title: 1, createdAt: 1, updatedAt: 1, description: 1 }
+      projection: { title: 1, createdAt: 1, updatedAt: 1, description: 1, budget: 1 }
     }).limit(20).toArray()
   ]);
 
@@ -98,15 +98,19 @@ export const getFreelancerProfile = async (userId) => {
     profileImage: profile?.profileImage || user?.image || null,
     completedJobs: completedJobsList.length,
     activeProjects: activeJobsList.length,
+    reviewCount: Array.isArray(profile?.reviews) ? profile.reviews.length : 0,
+    memberSince: user?.createdAt || profile?.memberSince || profile?.createdAt || null,
     completedJobsList: completedJobsList.map(j => ({
       title: j.title || "Completed Project",
       dateRange: j.updatedAt ? new Date(j.updatedAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "",
-      feedback: ""
+      feedback: "",
+      budget: j.budget || null
     })),
     activeJobsList: activeJobsList.map(j => ({
       title: j.title || "Ongoing Project",
       startDate: j.createdAt ? new Date(j.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "",
-      description: j.description || ""
+      description: j.description || "",
+      budget: j.budget || null
     }))
   };
 };
@@ -441,16 +445,9 @@ export const getAllFreelancerProfiles = async (page = 1, limit = 20, filters = {
 
   const skip = (page - 1) * limit;
   
-  // Step 1: Build the initial match for USERS collection (role and name search)
+  // Step 1: Build the initial match for USERS collection (role)
   const userMatch = { role: "freelancer", isDeleted: { $ne: true } };
   
-  if (filters.search) {
-    userMatch.$or = [
-      { name: { $regex: filters.search, $options: "i" } },
-      { email: { $regex: filters.search, $options: "i" } }
-    ];
-  }
-
   const pipeline = [
     { $match: userMatch },
     {
@@ -464,11 +461,23 @@ export const getAllFreelancerProfiles = async (page = 1, limit = 20, filters = {
     { $unwind: { path: "$profile", preserveNullAndEmptyArrays: true } }
   ];
 
-  // Step 2: Apply filters that depend on the PROFILE (skills, rate, location, etc.)
+  // Step 2: Apply filters that depend on the PROFILE (skills, rate, location, etc.) and SEARCH
   const profileMatch = {};
   
   if (filters.skills && filters.skills.length > 0) {
-    profileMatch["profile.skills"] = { $in: filters.skills };
+    const skillRegexes = filters.skills.map(s => {
+      const alphanumericOnly = s.replace(/[^a-z0-9]/gi, '');
+      const flexiblePattern = alphanumericOnly.split('').join('[^a-zA-Z0-9]*');
+      return new RegExp(`^${flexiblePattern}$`, 'i');
+    });
+    
+    profileMatch.$and = profileMatch.$and || [];
+    profileMatch.$and.push({
+      $or: [
+        { "profile.skills": { $in: skillRegexes } },
+        { "profile.skills.name": { $in: skillRegexes } }
+      ]
+    });
   }
   
   if (filters.minRate) {
@@ -486,13 +495,20 @@ export const getAllFreelancerProfiles = async (page = 1, limit = 20, filters = {
     profileMatch["profile.location"] = { $regex: filters.location, $options: "i" };
   }
 
-  // If search was provided, also check title and about in profile
+  // If search was provided, search across user and profile fields
   if (filters.search) {
-    // We already filtered by name/email in userMatch. 
-    // To also search in profile fields, we need to adjust the logic.
-    // Actually, a better way is to combine them, but for performance, 
-    // filtering users first is great. 
-    // Let's refine the match to be broader if search is present.
+    profileMatch.$and = profileMatch.$and || [];
+    const searchRegex = new RegExp(filters.search, "i");
+    profileMatch.$and.push({
+      $or: [
+        { name: searchRegex },
+        { email: searchRegex },
+        { "profile.title": searchRegex },
+        { "profile.about": searchRegex },
+        { "profile.skills": searchRegex },
+        { "profile.skills.name": searchRegex }
+      ]
+    });
   }
 
   if (Object.keys(profileMatch).length > 0) {
@@ -564,13 +580,24 @@ export const getAllFreelancerCategories = async () => {
           {
             $group: {
               _id: {
-                $cond: {
-                  if: { $eq: [{ $type: "$skills" }, "string"] },
-                  then: "$skills",
-                  else: "$skills.name"
+                $toLower: {
+                  $cond: {
+                    if: { $eq: [{ $type: "$skills" }, "string"] },
+                    then: "$skills",
+                    else: "$skills.name"
+                  }
                 }
               },
-              count: { $sum: 1 }
+              count: { $sum: 1 },
+              originalName: {
+                $first: {
+                  $cond: {
+                    if: { $eq: [{ $type: "$skills" }, "string"] },
+                    then: "$skills",
+                    else: "$skills.name"
+                  }
+                }
+              }
             }
           },
           { $sort: { count: -1 } },
@@ -612,8 +639,8 @@ export const getAllFreelancerCategories = async () => {
 
   const categories = Object.values(categoryMap).sort((a, b) => b.count - a.count);
   const topSkills = result.skills.map(s => ({
-    id: s._id?.toLowerCase().replace(/\s+/g, '') || "",
-    label: s._id || "",
+    id: s._id?.replace(/\s+/g, '') || "",
+    label: s.originalName || s._id || "",
     count: s.count
   }));
 

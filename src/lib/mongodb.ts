@@ -1,11 +1,20 @@
 import { MongoClient } from "mongodb";
-import { mongo } from "mongoose";
 
 const uri = process.env.MONGODB_URI as string;
 
 if (!uri) {
   throw new Error("Please define MONGODB_URI in .env.local");
 }
+
+// Connection options tuned for Next.js serverless/dev environment
+const mongoOptions = {
+  maxPoolSize: 10,           // Max concurrent connections in the pool
+  minPoolSize: 2,            // Keep at least 2 connections warm
+  connectTimeoutMS: 10000,   // 10s to establish connection
+  serverSelectionTimeoutMS: 5000, // 5s to find a server
+  socketTimeoutMS: 45000,    // 45s socket idle timeout
+  maxIdleTimeMS: 30000,      // Close idle connections after 30s
+};
 
 declare global {
   var _mongoClientPromise: Promise<MongoClient> | undefined;
@@ -14,18 +23,18 @@ declare global {
 let clientPromise: Promise<MongoClient>;
 
 if (process.env.NODE_ENV === "development") {
+  // In development, reuse connection across hot-reloads to avoid exhausting pool
   if (!global._mongoClientPromise) {
-    const client = new MongoClient(uri);
+    const client = new MongoClient(uri, mongoOptions);
     global._mongoClientPromise = client.connect();
     console.log("🟢 MongoDB: new connection (development)");
   } else {
-    console.log("♻️  MongoDB: Old connection is being reused (development)");
+    console.log("♻️  MongoDB: reusing connection (development)");
   }
   clientPromise = global._mongoClientPromise;
-
 } else {
-
-  const client = new MongoClient(uri);
+  // In production, create a new client (process is long-lived, pool handles concurrency)
+  const client = new MongoClient(uri, mongoOptions);
   clientPromise = client.connect();
 }
 
@@ -62,4 +71,4 @@ export const COLLECTIONS = {
   BUSINESS_PAGES: "business_pages",
 };
 
-export default clientPromise;
+export default clientPromise;

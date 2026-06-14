@@ -1,6 +1,7 @@
 import React from 'react';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
+import { formatClientInitials } from '@/utils/avatarColors';
 
 interface ClientInfoProps {
   name: string;
@@ -10,6 +11,7 @@ interface ClientInfoProps {
   memberSince: string;
   totalSpent: string;
   projectsPosted: number;
+  hoverRate?: number; // wait, let's keep original
   hireRate: number;
   rating: number;
   reviews: number;
@@ -38,14 +40,14 @@ const ClientInfo = ({
       <div className="flex items-start space-x-4 mb-6">
         <div className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
           <AppImage
-            src={avatar}
-            alt={avatarAlt}
-            className="w-full h-full object-cover"
+             src={avatar}
+             alt={avatarAlt}
+             className="w-full h-full object-cover"
           />
         </div>
         <div className="flex-1">
           <h3 className="text-lg font-display font-semibold text-foreground mb-1">
-            {name}
+            {formatClientInitials(name)}
           </h3>
           <div className="flex items-center space-x-2 text-sm text-muted-foreground mb-2">
             <Icon name="MapPinIcon" size={16} />

@@ -4,8 +4,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Icon from '@/components/ui/AppIcon';
 import Link from "next/link";
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { useGetResumeVideos } from '@/app/hook/useProfile';
 import type { ResumeVideoItem } from '@/app/api/profileApi';
+import { getCurrencySymbol } from "@/utils/currency";
+import { formatClientInitials } from "@/utils/avatarColors";
 
 export type JobForProposal = {
   id: string;
@@ -18,6 +21,7 @@ export type JobForProposal = {
   bids?: number;
   rating?: number;
   averageBid?: string;
+  currency?: string;
 };
 
 type ResumeVideo = {
@@ -50,7 +54,20 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+function getFileNameFromUrl(url: string): string {
+  const parts = url.split('/');
+  const rawName = parts[parts.length - 1];
+  const match = rawName.match(/^\d+_[a-z0-9]+_(.+)$/);
+  return match ? match[1] : rawName;
+}
+
 export default function SubmitProposalModal({ job, onClose, onBitUsed }: SubmitProposalModalProps) {
+  const { data: session } = useSession();
+  const userId = session?.user?.id;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [attachmentError, setAttachmentError] = useState('');
+
   // ── Form state ───────────────────────────────────────────────
   const [coverLetter, setCoverLetter] = useState('');
   const [proposedRate, setProposedRate] = useState('');
@@ -294,7 +311,57 @@ export default function SubmitProposalModal({ job, onClose, onBitUsed }: SubmitP
   const handleRemoveVideo = (index: number) => { setResumeVideos(prev => prev.filter((_, i) => i !== index)); setVideoError(''); };
 
   // ── Attachments ──────────────────────────────────────────────
-  const handleAddAttachment = () => setAttachments([...attachments, `Portfolio_Sample_${attachments.length + 1}.pdf`]);
+  const handleAddAttachment = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    if (!userId) {
+      setAttachmentError('User not authenticated');
+      return;
+    }
+    
+    setAttachmentError('');
+    setUploadingAttachment(true);
+    
+    try {
+      const formData = new FormData();
+      const fileArr = Array.from(files);
+      fileArr.forEach(file => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+        if (!allowedTypes.includes(file.type)) {
+          throw new Error(`Invalid format for file: ${file.name}. Only JPEG, PNG, and PDF are allowed.`);
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          throw new Error(`File ${file.name} is too large. Maximum size is 5MB.`);
+        }
+        formData.append('files', file);
+      });
+      
+      formData.append('documentType', 'portfolio');
+      
+      const res = await fetch(`/api/client/${userId}/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'File upload failed');
+      }
+      
+      const newUrls = data.data.files.map((f: any) => f.url);
+      setAttachments([...attachments, ...newUrls]);
+    } catch (err: any) {
+      setAttachmentError(err.message || 'File upload failed');
+    } finally {
+      setUploadingAttachment(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleRemoveAttachment = (index: number) => setAttachments(attachments.filter((_, i) => i !== index));
 
   // ── Submit ───────────────────────────────────────────────────
@@ -364,7 +431,8 @@ export default function SubmitProposalModal({ job, onClose, onBitUsed }: SubmitP
         jobTitle: job.title,
         depositRequired: Number(job.budget.replace(/[^\d.]/g, "")),
         jobLevel: job.level,
-        resumeID
+        resumeID,
+        currency: job.currency || "USD"
       };
       const proposalRes = await fetch('/api/proposals', {
         method: 'POST',
@@ -439,7 +507,7 @@ export default function SubmitProposalModal({ job, onClose, onBitUsed }: SubmitP
           <div className="flex gap-6 text-sm mb-6">
             <span className="text-[#1A1D23]"><strong>Budget:</strong> {job.budget}</span>
             <span className="text-[#1A1D23]"><strong>Bids:</strong> {job.bids}</span>
-            <span className="text-[#1A1D23]"><strong>Avg Bid:</strong> ${job.averageBid}</span>
+            <span className="text-[#1A1D23]"><strong>Avg Bid:</strong> {getCurrencySymbol(job.currency)}{job.averageBid}</span>
           </div>
 
           {/* Project Details */}
@@ -462,7 +530,7 @@ export default function SubmitProposalModal({ job, onClose, onBitUsed }: SubmitP
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-[#1B365D] flex items-center justify-center text-white font-bold text-sm">{job.clientInitials}</div>
               <div>
-                <p className="font-semibold text-[#1A1D23]">{job.clientName}</p>
+                <p className="font-semibold text-[#1A1D23]">{formatClientInitials(job.clientName || "")}</p>
                 <p className="text-sm text-[#6B7280]">Budget {job.budget}</p>
                 <div className="flex items-center gap-1 mt-1">
                   {[1, 2, 3, 4, 5].map(i => <Icon key={i} name="StarIcon" size={14} className="text-amber-400" variant="solid" />)}
@@ -503,9 +571,9 @@ export default function SubmitProposalModal({ job, onClose, onBitUsed }: SubmitP
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#1A1D23] mb-2">Proposed Rate (USD) *</label>
+                  <label className="block text-sm font-medium text-[#1A1D23] mb-2">Proposed Rate ({job.currency || "USD"}) *</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]">$</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]">{getCurrencySymbol(job.currency || "USD")}</span>
                     <input type="number" value={proposedRate} onChange={e => setProposedRate(e.target.value)} required placeholder="5000"
                       className="w-full pl-8 pr-4 py-3 border border-[#E2E8F0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B35] text-[#1A1D23]" />
                   </div>
@@ -863,19 +931,30 @@ export default function SubmitProposalModal({ job, onClose, onBitUsed }: SubmitP
               <div>
                 <label className="block text-sm font-medium text-[#1A1D23] mb-2">Attachments (Optional)</label>
                 <div className="space-y-2">
-                  {attachments.map((name, index) => (
+                  {attachments.map((url, index) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-[#F7FAFC] rounded-lg border border-[#E2E8F0]">
-                      <span className="text-sm text-[#1A1D23]">{name}</span>
-                      <button type="button" onClick={() => handleRemoveAttachment(index)} className="p-1 hover:bg-red-50 rounded text-[#6B7280]">
+                      <span className="text-sm text-[#1A1D23] truncate pr-4">{getFileNameFromUrl(url)}</span>
+                      <button type="button" onClick={() => handleRemoveAttachment(index)} className="p-1 hover:bg-red-50 rounded text-[#6B7280] flex-shrink-0">
                         <Icon name="XMarkIcon" size={18} />
                       </button>
                     </div>
                   ))}
-                  <button type="button" onClick={handleAddAttachment}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-[#E2E8F0] rounded-lg hover:border-[#FF6B35] hover:bg-orange-50/50 transition-colors text-[#FF6B35] font-medium text-sm">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept=".pdf,.png,.jpg,.jpeg"
+                    multiple
+                  />
+                  <button type="button" onClick={handleAddAttachment} disabled={uploadingAttachment}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-[#E2E8F0] rounded-lg hover:border-[#FF6B35] hover:bg-orange-50/50 transition-colors text-[#FF6B35] font-medium text-sm disabled:opacity-50">
                     <Icon name="PlusIcon" size={20} />
-                    Add Portfolio Sample
+                    {uploadingAttachment ? 'Uploading portfolio sample...' : 'Add Portfolio Sample'}
                   </button>
+                  {attachmentError && (
+                    <p className="text-xs text-red-600 font-medium mt-1">{attachmentError}</p>
+                  )}
                 </div>
               </div>
 

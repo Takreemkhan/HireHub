@@ -68,10 +68,10 @@ export async function GET(
       .collection("users")
       .findOne(
         { _id: new ObjectId(userId) },
-        { projection: { name: 1, firstName: 1, lastName: 1, email: 1, profileImage: 1 } }
+        { projection: { name: 1, firstName: 1, lastName: 1, email: 1, profileImage: 1, role: 1 } }
       );
 
-    if (!user) return NextResponse.json({ name: "User", profileImage: null });
+    if (!user) return NextResponse.json({ name: "User", profileImage: null, role: null });
 
     let profileImage = user.profileImage || null;
 
@@ -100,7 +100,7 @@ export async function GET(
       user.email?.split("@")[0] ||
       "User";
 
-    return NextResponse.json({ name, profileImage });
+    return NextResponse.json({ name, profileImage, role: user.role || null });
   } catch (error) {
     console.error("Error fetching user name:", error);
     return NextResponse.json({ name: "User", profileImage: null });

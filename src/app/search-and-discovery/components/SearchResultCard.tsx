@@ -61,7 +61,10 @@ const SearchResultCard = ({ result, onSave, isSaved, onClick }: SearchResultCard
                 {result.title}
               </h3>
               {result.featured && (
-                <Icon name="StarIcon" size={20} variant="solid" className="text-yellow-500 flex-shrink-0" />
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-50 text-amber-600 border border-amber-200 shadow-sm flex-shrink-0">
+                  <Icon name="StarIcon" size={12} variant="solid" className="text-amber-500" />
+                  Featured
+                </span>
               )}
             </div>
 

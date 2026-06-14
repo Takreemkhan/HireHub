@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Star, Search, X, Check } from "lucide-react";
 import Header from "@/components/common/Header";
 import FooterSection from "@/app/homepage/components/FooterSection";
+import { getCurrencySymbol } from "@/utils/currency";
 
 const freelancers = [
   {
@@ -134,6 +135,19 @@ function InviteFreelancersContent() {
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [invitedIds, setInvitedIds] = useState<string[]>([]);
   const [showSuccessToast, setShowSuccessToast] = useState<string | null>(null);
+  const [currencySymbol, setCurrencySymbol] = useState("£");
+
+  useEffect(() => {
+    if (!jobId) return;
+    fetch(`/api/jobs/${jobId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.job?.currency) {
+          setCurrencySymbol(getCurrencySymbol(data.job.currency));
+        }
+      })
+      .catch(console.error);
+  }, [jobId]);
 
   const filteredFreelancers = freelancers.filter(
     (f) =>
@@ -313,7 +327,7 @@ function InviteFreelancersContent() {
 
                     {/* Rate + Invite */}
                     <div className="flex items-center justify-between w-full pt-3 border-t border-gray-100">
-                      <span className="text-base font-bold text-gray-900">{freelancer.hourlyRate}</span>
+                      <span className="text-base font-bold text-gray-900">{freelancer.hourlyRate.replace("£", currencySymbol)}</span>
                       <button
                         onClick={() => handleInvite(freelancer)}
                         disabled={isInvited}

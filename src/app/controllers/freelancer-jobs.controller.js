@@ -23,7 +23,8 @@ export const getFreelancerCurrentJobs = async (freelancerId, page = 1, limit = 1
       { freelancerId: freelancerObjId },
       { freelancerId: freelancerId.toString() }
     ],
-    status: "in-progress"
+    status: "in-progress",
+    isDeleted: { $ne: true }
   };
 
   const [jobs, total] = await Promise.all([
@@ -113,7 +114,8 @@ export const getFreelancerCompletedJobs = async (freelancerId, page = 1, limit =
       { freelancerId: freelancerObjId },
       { freelancerId: freelancerId.toString() }
     ],
-    status: "completed"
+    status: "completed",
+    isDeleted: { $ne: true }
   };
 
   const [jobs, total] = await Promise.all([

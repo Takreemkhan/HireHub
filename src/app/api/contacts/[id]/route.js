@@ -16,7 +16,11 @@ export async function GET(req, context) {
       .collection(COLLECTIONS.CONTACTS)
       .findOne({ userId: new ObjectId(params.id) });
 
-    return NextResponse.json({ success: true, contact: contact || null }, { status: 200 });
+    const user = await db
+      .collection("users")
+      .findOne({ _id: new ObjectId(params.id) }, { projection: { rating: 1 } });
+
+    return NextResponse.json({ success: true, contact: contact || null, rating: user?.rating || 0 }, { status: 200 });
   } catch (error) {
     console.error("Contact GET error:", error);
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });

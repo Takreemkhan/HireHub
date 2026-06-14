@@ -20,12 +20,13 @@ interface ChatPageProps {
 interface UserCacheDetails {
   name: string;
   profileImage: string | null;
+  role?: string | null;
 }
 
 const userCache: Record<string, UserCacheDetails> = {};
 
 const fetchUserDetails = async (userId: string): Promise<UserCacheDetails> => {
-  if (!userId) return { name: "User", profileImage: null };
+  if (!userId) return { name: "User", profileImage: null, role: null };
   if (userCache[userId]) return userCache[userId];
   try {
     const res = await fetch(`/api/user/name/${userId}`);
@@ -33,11 +34,12 @@ const fetchUserDetails = async (userId: string): Promise<UserCacheDetails> => {
       const data = await res.json();
       const name = data?.name && data.name !== "User" ? data.name : "User";
       const profileImage = data?.profileImage || null;
-      userCache[userId] = { name, profileImage };
-      return { name, profileImage };
+      const role = data?.role || null;
+      userCache[userId] = { name, profileImage, role };
+      return { name, profileImage, role };
     }
   } catch (_) { }
-  return { name: "User", profileImage: null };
+  return { name: "User", profileImage: null, role: null };
 };
 
 export default function ChatPage({ userId }: ChatPageProps) {
@@ -57,6 +59,7 @@ export default function ChatPage({ userId }: ChatPageProps) {
   const [pinnedJobCurrency, setPinnedJobCurrency] = useState<string | null>(
     null,
   );
+  const [pinnedJobBudget, setPinnedJobBudget] = useState<string | null>(null);
   const [pinnedJobPaymentStatus, setPinnedJobPaymentStatus] = useState<
     string | null
   >(null);
@@ -137,6 +140,7 @@ export default function ChatPage({ userId }: ChatPageProps) {
             if (data?.job?.title) {
               setPinnedJobTitle(data.job.title);
               setPinnedJobCurrency(data.job.currency || "USD");
+              setPinnedJobBudget(data.job.budget ? `$${data.job.budget}` : null);
               setPinnedJobClientId(data.job.clientId || null);
               // Check if we already have an assignment for this job in the current chat context
               if (activeChatId) {
@@ -151,16 +155,22 @@ export default function ChatPage({ userId }: ChatPageProps) {
                       assignData.pinnedJob?.jobStatus === "completed",
                     );
                     setPinnedJobPaymentStatus(
-                      assignData.pinnedJob?.paymentStatus || null,
+                      assignData.pinnedJob?.paymentStatus || data.job.paymentStatus || null,
                     );
+                    if (assignData.pinnedJob?.jobBudget) {
+                      setPinnedJobBudget(`$${assignData.pinnedJob.jobBudget}`);
+                    }
                   }
                 } catch (e) {
                   setIsPinnedJobAssigned(false);
                   setIsPinnedJobCompleted(false);
-                  setPinnedJobPaymentStatus(null);
+                  setPinnedJobPaymentStatus(data.job.paymentStatus || null);
                 }
+              } else {
+                setIsPinnedJobAssigned(false);
+                setIsPinnedJobCompleted(false);
+                setPinnedJobPaymentStatus(data.job.paymentStatus || null);
               }
-              // If no activeChatId yet, stay null so we don't flicker yellow
             }
           }
         } catch (error) {
@@ -176,6 +186,7 @@ export default function ChatPage({ userId }: ChatPageProps) {
         setPinnedJobTitle(null);
         setPinnedJobIdState(null);
         setPinnedJobCurrency(null);
+        setPinnedJobBudget(null);
         setPinnedJobPaymentStatus(null);
         setPinnedJobClientId(null);
         setIsPinnedJobAssigned(false);
@@ -200,6 +211,7 @@ export default function ChatPage({ userId }: ChatPageProps) {
             setPinnedJobTitle(d.pinnedJob.jobTitle);
             setPinnedJobIdState(d.pinnedJob.jobId || null);
             setPinnedJobCurrency(d.pinnedJob.jobCurrency || "USD");
+            setPinnedJobBudget(d.pinnedJob.jobBudget ? `$${d.pinnedJob.jobBudget}` : null);
             setPinnedJobPaymentStatus(d.pinnedJob.paymentStatus || null);
             setPinnedJobClientId(d.pinnedJob.clientId || null);
             setIsPinnedJobAssigned(!!d.assigned);
@@ -208,6 +220,7 @@ export default function ChatPage({ userId }: ChatPageProps) {
             setPinnedJobTitle(null);
             setPinnedJobIdState(null);
             setPinnedJobCurrency(null);
+            setPinnedJobBudget(null);
             setPinnedJobPaymentStatus(null);
             setPinnedJobClientId(null);
             setIsPinnedJobAssigned(false);
@@ -247,11 +260,11 @@ export default function ChatPage({ userId }: ChatPageProps) {
               .find((m: any) => m.senderId?.toString() !== userId?.toString())
               ?.senderId?.toString() || "";
         }
-        let resolvedDetails: UserCacheDetails | null = peerName
-          ? { name: peerName, profileImage: null }
-          : null;
-        if (!resolvedDetails && otherSenderId) {
+        let resolvedDetails: UserCacheDetails | null = null;
+        if (otherSenderId) {
           resolvedDetails = await fetchUserDetails(otherSenderId);
+        } else if (peerName) {
+          resolvedDetails = { name: peerName, profileImage: null, role: null };
         }
         return {
           _id: chatId,
@@ -269,6 +282,7 @@ export default function ChatPage({ userId }: ChatPageProps) {
                   _id: otherSenderId || "",
                   name: resolvedDetails?.name || "User",
                   profileImage: resolvedDetails?.profileImage || null,
+                  role: resolvedDetails?.role || "",
                 },
               ]
               : undefined,
@@ -325,11 +339,12 @@ export default function ChatPage({ userId }: ChatPageProps) {
               userCache[otherId] = {
                 name: peerNameFromUrl,
                 profileImage: null,
+                role: "freelancer",
               };
             return {
               ...chat,
               participantDetails: [
-                { _id: otherId, name: peerNameFromUrl, profileImage: null },
+                { _id: otherId, name: peerNameFromUrl, profileImage: null, role: "freelancer" },
               ],
             };
           }
@@ -688,6 +703,7 @@ export default function ChatPage({ userId }: ChatPageProps) {
         onRefreshChats={refreshChats}
         pinnedJobTitle={pinnedJobTitle}
         pinnedJobId={jobIdFromUrl ?? pinnedJobIdState}
+        pinnedJobBudget={pinnedJobBudget}
         isJobAssigned={isPinnedJobAssigned}
         isJobCompleted={isPinnedJobCompleted}
         isJobLoading={isJobLoading}

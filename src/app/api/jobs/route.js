@@ -193,6 +193,29 @@ export async function POST(req) {
       );
     }
 
+
+
+
+
+
+
+    //  if(result.requiresPayment) {
+    //       return NextResponse.json(
+    //         {
+    //           success:false,
+    //           requirespayment:true,
+    //           message:"Payment required to post this job ",
+    //           PaymentRequired: result.paymentRequired,
+    //           totalJobsposted:result.totalJobsPosted,
+    //           freeJobsRemaining:result.freejobsremaining
+    //         },
+    //         {status:402}
+    //       );
+    //      }
+
+
+
+
     // Job posted successfully (free)
     // Invalidate jobs cache since a new job was added
     await invalidateCache('api:jobs:all');
@@ -206,6 +229,13 @@ export async function POST(req) {
       },
       { status: 201 }
     );
+
+    return NextResponse.json(
+      {
+        sucess: true,
+        message: result.message,
+      }
+    )
 
   } catch (error) {
     console.error("Job POST error:", error);

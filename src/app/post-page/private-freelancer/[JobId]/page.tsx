@@ -289,11 +289,28 @@ export default function PrivateFreelancerPage() {
                 }
             },
             {
-                onSuccess: () => {
+                onSuccess: async () => {
                     setInvitedIds((prev) => [...prev, id]);
                     refetch();
-                    setLoadingId(null);
-
+                    const activeJobId = params.JobId || currentJobId;
+                    try {
+                        const chatRes = await fetch("/api/chat/with-user", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ otherUserId: String(id), jobId: activeJobId }),
+                        });
+                        const chatData = await chatRes.json();
+                        const queryParams = new URLSearchParams();
+                        if (chatData?.chatId) queryParams.set("chatId", chatData.chatId);
+                        queryParams.set("otherUserId", String(id));
+                        queryParams.set("jobId", activeJobId);
+                        if (name) queryParams.set("peerName", name);
+                        
+                        router.push(`/client/messages?${queryParams.toString()}`);
+                    } catch (err) {
+                        console.error("Failed to redirect to chat:", err);
+                        setLoadingId(null);
+                    }
                 },
                 onError: (err) => {
                     console.error("Failed to invite freelancer:", err);
@@ -455,7 +472,7 @@ function FreelancerCard({
 
                 <div className="flex justify-center items-center gap-1 mt-2 text-xs sm:text-sm">
                     ⭐ {freelancer.rating}
-                    <span className="text-gray-500">({freelancer.reviews})</span>
+                    <span className="text-gray-500">({freelancer.reviews?.length || 0})</span>
                 </div>
 
                 <p className="mt-3 text-sm sm:text-base font-semibold text-gray-900">

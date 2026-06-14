@@ -70,10 +70,44 @@ export async function GET(req) {
             {
                 $addFields: {
                     projectTitle: { $ifNull: [{ $arrayElemAt: ["$jobInfo.title", 0] }, "N/A"] },
-                    businessPageId: { $ifNull: [{ $arrayElemAt: ["$jobInfo.businessPageId", 0] }, "$businessPageId", null] }
+                    resolvedBusinessPageId: { $ifNull: [{ $arrayElemAt: ["$jobInfo.businessPageId", 0] }, "$businessPageId", null] }
                 }
             },
-            { $project: { jobInfo: 0 } }
+            {
+                $addFields: {
+                    businessPageIdObj: {
+                        $cond: {
+                            if: { $and: [
+                                { $ne: ["$resolvedBusinessPageId", null] },
+                                { $ne: ["$resolvedBusinessPageId", ""] }
+                            ]},
+                            then: {
+                                $cond: {
+                                    if: { $eq: [{ $type: "$resolvedBusinessPageId" }, "objectId"] },
+                                    then: "$resolvedBusinessPageId",
+                                    else: { $toObjectId: "$resolvedBusinessPageId" }
+                                }
+                            },
+                            else: null
+                        }
+                    }
+                }
+            },
+            {
+                $lookup: {
+                    from: "business_pages",
+                    localField: "businessPageIdObj",
+                    foreignField: "_id",
+                    as: "businessPageInfo"
+                }
+            },
+            {
+                $addFields: {
+                    businessPageId: "$resolvedBusinessPageId",
+                    businessPageName: { $ifNull: [{ $arrayElemAt: ["$businessPageInfo.name", 0] }, null] }
+                }
+            },
+            { $project: { jobInfo: 0, businessPageInfo: 0, businessPageIdObj: 0, resolvedBusinessPageId: 0 } }
         ];
 
         const [transactions, total] = await Promise.all([

@@ -622,6 +622,7 @@ import ClientInfo from './ClientInfo';
 import ApplicationForm from './ApplicationForm';
 import RelatedProjects from './RelatedProjects';
 import Icon from '@/components/ui/AppIcon';
+import { getCurrencySymbol } from '@/utils/currency';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -643,9 +644,10 @@ function timeAgo(dateString: string): string {
   return `${years} year${years !== 1 ? 's' : ''} ago`;
 }
 
-function formatBudget(budget: number): string {
+function formatBudget(budget: number, currencyCode?: string): string {
   if (!budget) return 'Not specified';
-  return `£${budget.toLocaleString()}`;
+  const symbol = getCurrencySymbol(currencyCode || 'GBP');
+  return `${symbol}${budget.toLocaleString()}`;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -762,7 +764,7 @@ const ProjectDetailInteractive = () => {
     title: job.title,
     category: job.category || 'General',
     postedDate: timeAgo(job.createdAt),
-    budget: formatBudget(job.budget),
+    budget: formatBudget(job.budget, job.currency),
     budgetAmount: job.budget,
     budgetType: 'Fixed Price', // Currently all jobs are fixed price
     experienceLevel: 'Intermediate', // Placeholder — add to schema later
@@ -821,6 +823,7 @@ const ProjectDetailInteractive = () => {
                   projectTitle={projectData.title}
                   jobId={job._id}
                   onSubmit={handleApplicationSubmit}
+                  currency={job.currency}
                 />
               </div>
             )}

@@ -8,6 +8,7 @@ interface Job {
   feedback?: string;
   startDate?: string;
   description?: string;
+  budget?: number | string;
 }
 
 export default function CompletedJobs({
@@ -62,16 +63,20 @@ export default function CompletedJobs({
                   key={index}
                   className="py-6 transition-colors hover:bg-gray-50 px-4 rounded-lg group"
                 >
-                  <h4 className="text-blue-500 font-bold text-lg group-hover:underline cursor-pointer">
-                    {job.title}
-                  </h4>
+                  <div className="flex justify-between items-start">
+                    <h4 className="text-blue-500 font-bold text-lg group-hover:underline cursor-pointer">
+                      {job.title}
+                    </h4>
+                    {job.budget && (
+                      <span className="text-[15px] font-bold text-gray-700">${job.budget}</span>
+                    )}
+                  </div>
                   {job.dateRange && (
                     <p className="text-xs text-gray-400 mt-1 italic">{job.dateRange}</p>
                   )}
                   {job.feedback && (
                     <p className="text-[15px] text-gray-600 mt-4 italic">"{job.feedback}"</p>
                   )}
-                  <p className="text-xs text-gray-400 mt-2">Private earnings</p>
                 </div>
               ))
             ) : completedCount > 0 ? (
@@ -94,9 +99,14 @@ export default function CompletedJobs({
                   key={index}
                   className="py-6 transition-colors hover:bg-gray-50 px-4 rounded-lg group"
                 >
-                  <h4 className="text-blue-500 font-bold text-lg group-hover:underline cursor-pointer">
-                    {job.title}
-                  </h4>
+                  <div className="flex justify-between items-start">
+                    <h4 className="text-blue-500 font-bold text-lg group-hover:underline cursor-pointer">
+                      {job.title}
+                    </h4>
+                    {job.budget && (
+                      <span className="text-[15px] font-bold text-gray-700">${job.budget}</span>
+                    )}
+                  </div>
                   {job.startDate && (
                     <p className="text-xs text-gray-400 mt-1 italic">Started {job.startDate}</p>
                   )}
