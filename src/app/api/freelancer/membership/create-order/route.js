@@ -26,87 +26,50 @@ export async function POST(req) {
     if (!auth.authenticated) return unauthorizedResponse(auth.error);
 
     const body = await req.json();
+    const bidsCount = parseInt(body.bidsCount);
 
-    // ── New API: packKey ────────────────────────────────────────────────────
-    if (body.packKey) {
-      const client = await clientPromise;
-      const db = client.db(DB_NAME);
-
-      const pack = await db.collection(COLLECTIONS.BIDS).findOne({ packKey: body.packKey });
-
-      if (!pack) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `Invalid pack selection.`,
-          },
-          { status: 400 }
-        );
-      }
-
-      const amountInPaise = pack.amountINR * 100;
-      const order = await razorpay.orders.create({
-        amount: amountInPaise,
-        currency: "INR",
-        receipt: `bids_${body.packKey}_${Date.now()}`,
-        notes: {
-          userId: auth.userId,
-          packKey: body.packKey,
-          bidsToAdd: pack.bids,
-        },
-      });
-
+    if (isNaN(bidsCount) || bidsCount < 1) {
       return NextResponse.json(
-        {
-          success: true,
-          orderId: order.id,
-          amount: amountInPaise,
-          currency: "INR",
-          packKey: body.packKey,
-          packLabel: pack.label,
-          bidsToAdd: pack.bids,
-          keyId: process.env.RAZORPAY_KEY_ID,
-        },
-        { status: 201 }
+        { success: false, message: "Invalid bidsCount. Must be greater than 0." },
+        { status: 400 }
       );
     }
 
-    // ── Legacy API: plan=custom + bidsCount ─────────────────────────────────
-    if (body.plan === "custom" && body.bidsCount) {
-      const PRICE_PER_BID_INR = 415;
-      const count = parseInt(body.bidsCount);
-      if (isNaN(count) || count < 1 || count > 500) {
-        return NextResponse.json(
-          { success: false, message: "bidsCount must be between 1 and 500" },
-          { status: 400 }
-        );
-      }
-      const amountINR = count * PRICE_PER_BID_INR;
-      const amountInPaise = amountINR * 100;
-      const order = await razorpay.orders.create({
-        amount: amountInPaise,
-        currency: "INR",
-        receipt: `custom_bids_${Date.now()}`,
-        notes: { userId: auth.userId, plan: "custom", bidsCount: count },
-      });
-      return NextResponse.json(
-        {
-          success: true,
-          orderId: order.id,
-          amount: amountInPaise,
-          currency: "INR",
-          plan: "custom",
-          planLabel: "Custom Bids",
-          bitsTotal: count,
-          keyId: process.env.RAZORPAY_KEY_ID,
-        },
-        { status: 201 }
-      );
-    }
+    const client = await clientPromise;
+    const db = client.db(DB_NAME);
+
+    // Fetch dynamic rate from DB (plus monthly plan)
+    const plusPlan = await db.collection(COLLECTIONS.FREELANCER_PLAN).findOne({ planKey: "plus" });
+    const monthlyAmount = plusPlan?.pricing?.monthly?.amountUSD || 25;
+    const monthlyBids = plusPlan?.pricing?.monthly?.bids || 30;
+
+    const costPerBidUSD = monthlyAmount / monthlyBids;
+    const totalUSD = costPerBidUSD * bidsCount;
+    const amountINR = totalUSD * 83;
+    const amountInPaise = Math.round(amountINR * 100);
+
+    const order = await razorpay.orders.create({
+      amount: amountInPaise,
+      currency: "INR",
+      receipt: `custom_bids_${Date.now()}`,
+      notes: {
+        userId: auth.userId,
+        bidsCount: String(bidsCount),
+        amountUSD: String(totalUSD.toFixed(2)),
+      },
+    });
 
     return NextResponse.json(
-      { success: false, message: "Provide packKey or plan=custom with bidsCount" },
-      { status: 400 }
+      {
+        success: true,
+        orderId: order.id,
+        amount: amountInPaise,
+        currency: "INR",
+        bidsCount,
+        amountUSD: totalUSD,
+        keyId: process.env.RAZORPAY_KEY_ID,
+      },
+      { status: 201 }
     );
   } catch (error) {
     console.error("Create-order error:", error);

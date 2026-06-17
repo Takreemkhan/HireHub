@@ -1379,27 +1379,6 @@ export default function Profile({ onProfileImageChange }: ProfileProps = {}) {
                     )}
                   </div>
                 </SideCard>
-
-                <SideCard title="Contact Information">
-                  <div className="space-y-2.5">
-                    {[
-                      { key: "email" as const, label: "Email", icon: "✉️" },
-                      { key: "phone" as const, label: "Phone", icon: "📞" },
-                      { key: "website" as const, label: "Website", icon: "🌐" },
-                      { key: "linkedin" as const, label: "LinkedIn", icon: "💼" },
-                      { key: "github" as const, label: "GitHub", icon: "💻" },
-                    ].map(({ key, label, icon }) => (
-                      <div key={key} className="flex items-center gap-2">
-                        <span className="text-base w-5 flex-shrink-0">{icon}</span>
-                        {isEditing ? (
-                          <input value={data.contact[key]} onChange={(e) => update("contact", { ...data.contact, [key]: e.target.value })} placeholder={label} className="border border-blue-200 rounded-lg px-2 py-1 text-xs w-full focus:outline-none bg-blue-50" />
-                        ) : (
-                          <span className="text-xs text-gray-600 truncate">{data.contact[key]}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </SideCard>
               </div>
             </div>
           </div>

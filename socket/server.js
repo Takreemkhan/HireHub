@@ -324,7 +324,7 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.SOCKET_PORT || 3001;
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Socket.IO Server running on port ${PORT}`);
   console.log(`📡 Notification emit endpoint: POST http://localhost:${PORT}/emit-notification`);
 });

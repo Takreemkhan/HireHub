@@ -1,18 +1,11 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import clientPromise, { DB_NAME } from "@/lib/mongodb";
+import clientPromise, { DB_NAME, COLLECTIONS } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { verifyAuth, unauthorizedResponse } from "@/lib/auth.middleware";
 import { invalidateCache } from "@/lib/redis";
 
-/**
- * Fixed bid packs (must match create-order route)
- */
-const BID_PACKS = {
-  pack10: { bids: 10, amountINR: 199, label: "10 Bids" },
-  pack20: { bids: 20, amountINR: 349, label: "20 Bids" },
-  pack50: { bids: 50, amountINR: 799, label: "50 Bids" },
-};
+// Static BID_PACKS removed - dynamically managed
 
 /**
  * POST /api/freelancer/membership/verify
@@ -30,12 +23,12 @@ export async function POST(req) {
 
     console.log("freelancer bids verify");
 
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, packKey, plan, bidsCount } =
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, bidsCount } =
       await req.json();
 
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !bidsCount) {
       return NextResponse.json(
-        { success: false, message: "All payment fields are required" },
+        { success: false, message: "All payment verification fields and bidsCount are required" },
         { status: 400 }
       );
     }
@@ -58,31 +51,23 @@ export async function POST(req) {
     const userId = new ObjectId(auth.userId);
     const now = new Date();
 
-    // ── Determine how many bids to add ────────────────────────────────────
-    let bidsToAdd = 0;
-    let packLabel = "";
-
-    if (packKey && BID_PACKS[packKey]) {
-      // New pack-based flow
-      bidsToAdd = BID_PACKS[packKey].bids;
-      packLabel = BID_PACKS[packKey].label;
-    } else if (plan === "custom" && bidsCount) {
-      // Legacy custom flow
-      bidsToAdd = parseInt(bidsCount);
-      packLabel = `${bidsToAdd} Bids`;
-    } else {
-      return NextResponse.json(
-        { success: false, message: "Invalid pack or bidsCount" },
-        { status: 400 }
-      );
-    }
-
+    const bidsToAdd = parseInt(bidsCount);
     if (isNaN(bidsToAdd) || bidsToAdd < 1) {
       return NextResponse.json(
         { success: false, message: "Invalid bids count" },
         { status: 400 }
       );
     }
+
+    // Fetch dynamic rates to record accurate USD invoice value
+    const plusPlan = await db.collection(COLLECTIONS.FREELANCER_PLAN).findOne({ planKey: "plus" });
+    const monthlyAmount = plusPlan?.pricing?.monthly?.amountUSD || 25;
+    const monthlyBids = plusPlan?.pricing?.monthly?.bids || 30;
+
+    const costPerBidUSD = monthlyAmount / monthlyBids;
+    const amountUSD = Number((costPerBidUSD * bidsToAdd).toFixed(2));
+
+    const packLabel = `${bidsToAdd} Bids`;
 
     // ── Top-up: $inc bidsTotal (existing bids preserved) ──────────────────
     await db.collection("freelancer_bids").updateOne(
@@ -106,9 +91,10 @@ export async function POST(req) {
     // ── Record in bid_purchases for invoice history ────────────────────────
     await db.collection("bid_purchases").insertOne({
       userId,
-      packKey: packKey ?? "custom",
+      packKey: "custom",
       packLabel,
       bidsAdded: bidsToAdd,
+      amountUSD,
       orderId: razorpay_order_id,
       paymentId: razorpay_payment_id,
       purchasedAt: now,

@@ -15,7 +15,6 @@ import InvitationsSection from "./components/InvitationsSection";
 import Navbar from "../client/components/navbar";
 
 // Settings components
-import ContactInfo from '@/components/common/Contacts/ContactInfo';
 import MembershipConnects from "./components/SettingsSection/MembershipConnects";
 import Transactions from "./components/SettingsSection/Transactions";
 import Withdrawals from "./components/SettingsSection/Withdrawals";
@@ -113,7 +112,6 @@ function FreelancerDashboardInner({ id }: { id: string }) {
   const settingsItems = [
     { label: "Withdrawals", value: "settings-withdrawals" },
     { label: "Membership and Connects", value: "settings-membership" },
-    { label: "Contact Info", value: "settings-contact" },
     { label: "Transactions", value: "settings-transactions" },
     { label: "Profile Settings", value: "settings-profile" },
   ];
@@ -156,7 +154,6 @@ function FreelancerDashboardInner({ id }: { id: string }) {
       case "settings-profile": return <Settings />;
       case "settings-withdrawals": return <Withdrawals />;
       case "settings-membership": return <MembershipConnects />;
-      case "settings-contact": return <ContactInfo />;
       case "settings-transactions": return <Transactions />;
       default: return <OverviewSection />;
     }

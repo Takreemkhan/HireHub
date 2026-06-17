@@ -39,13 +39,13 @@
     "warning": "🚨 CRITICAL: DO NOT REMOVE OR MODIFY ABOVE DEPENDENCIES - Required for Next.js 15 TypeScript app functionality"
   },
   "scripts": {
-    "dev": "concurrently \"next dev -p 4028\" \"node socket/server.js\"",
+    "dev": "concurrently \"next dev -p 4028 -H 0.0.0.0\" \"node socket/server.js\"",
     "build": "next build",
-    "start": "next start -p 4028",
+    "start": "next start -p 4028 -H 0.0.0.0",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,md,json}\"",
-    "serve": "next start",
+    "serve": "next start -H 0.0.0.0",
     "type-check": "tsc --noEmit",
     "clean": "rmdir /s /q .next 2>nul || rm -rf .next"
   },

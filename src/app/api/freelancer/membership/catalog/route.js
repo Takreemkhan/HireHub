@@ -10,11 +10,15 @@ export async function GET(req) {
         const client = await clientPromise;
         const db = client.db(DB_NAME);
 
-        const bidPacks = await db.collection(COLLECTIONS.BIDS).find({ packKey: { $exists: true } }).sort({ amountINR: 1 }).toArray();
+        const plusPlan = await db.collection(COLLECTIONS.FREELANCER_PLAN).findOne({ planKey: "plus" });
+        const monthlyAmount = plusPlan?.pricing?.monthly?.amountUSD || 25;
+        const monthlyBids = plusPlan?.pricing?.monthly?.bids || 30;
 
         return NextResponse.json({
             success: true,
-            bidPacks: bidPacks
+            monthlyAmount,
+            monthlyBids,
+            exchangeRate: 83
         });
     } catch (error) {
         console.error("Bids catalog error:", error);

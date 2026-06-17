@@ -21,22 +21,24 @@ export async function POST(req) {
             .findOne({ freelancerId: auth.userId });
 
         const now = new Date();
+        // Allow upload if: explicit isPlanActive flag OR planKey is 'plus' with a valid expiry
+        const hasValidExpiry = sub?.planExpiry && new Date(sub.planExpiry) > now;
         const isPlanActive = sub
-            ? sub.isPlanActive && sub.planExpiry && new Date(sub.planExpiry) > now
+            ? (sub.isPlanActive && hasValidExpiry) || (sub.planKey === 'plus' && hasValidExpiry)
             : false;
 
         if (!isPlanActive) {
             return NextResponse.json(
                 {
                     success: false,
-                    message: 'Upgrade to a Resume Video plan (Basic / Pro / Elite) to upload videos.',
+                    message: 'Upgrade to the Plus Plan to upload resume videos.',
                     code: 'NO_VIDEO_PLAN',
                 },
                 { status: 403 }
             );
         }
 
-        const maxVideos = sub.maxVideos ?? 1;
+        const maxVideos = sub.planKey === 'plus' ? 3 : (sub.maxVideos ?? 1);
 
         // ── Parse form data ────────────────────────────────────────────────
         const formData = await req.formData();
