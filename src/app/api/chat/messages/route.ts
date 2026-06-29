@@ -196,7 +196,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid data" }, { status: 400 });
     }
 
-    // ✅ RESTRICTION CHECK: Email, phone, external links block karo
+    // ✅ RESTRICTION CHECK: Block email, phone, and external links
     const messageContent = message.content || message.text || "";
     const filterResult = filterMessage(messageContent);
     if (filterResult.blocked) {
@@ -240,12 +240,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Chat not found" }, { status: 404 });
     }
 
-    // ✅ NOTIFICATION: receiver ko notify karo (fire-and-forget)
-    // message.senderId = jo bhej raha hai
-    // message.receiverId = jo receive karega (freelancer ya client)
+    // ✅ NOTIFICATION: Notify the receiver (fire-and-forget)
+    // message.senderId = the sender
+    // message.receiverId = the receiver (freelancer or client)
     if (message.senderId && message.receiverId) {
       try {
-        // Sender ka naam fetch karo
+        // Fetch the sender's name
         const sender = await db.collection(COLLECTIONS.USERS).findOne(
           { _id: new ObjectId(message.senderId) },
           { projection: { name: 1 } }
@@ -253,15 +253,15 @@ export async function POST(req: Request) {
 
         const senderName = sender?.name || "Someone";
 
-        // Receiver ko notification bhejo
+        // Send notification to the receiver
         await notifyNewMessage({
-          recipientId: message.receiverId,   // jo receive karega
-          senderId: message.senderId,     // jo bhej raha hai
+          recipientId: message.receiverId,   // the receiver
+          senderId: message.senderId,     // the sender
           senderName: senderName,
           chatId: chatId,
         });
       } catch (notifErr) {
-        // Notification fail hone se message send fail nahi hoga
+        // Failing to notify should not fail message sending
         console.warn("⚠️ Notification failed (non-blocking):", notifErr);
       }
     }

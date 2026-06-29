@@ -5,16 +5,16 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { User, CreditCard, Phone, Mail } from "lucide-react";
 
-export default function ProfilePage() {
+export default function ProfilePage({ profile }: { profile?: any }) {
   const router = useRouter();
   const stats = [
     { label: "On time", value: "100%" },
     { label: "On budget", value: "100%" },
     { label: "Accept rate", value: "100%" },
   ];
-  const [cover, setCover] = useState<string | null>(null);
-  const [logo, setLogo] = useState<string | null>(null);
-  const [company, setCompany] = useState("Coding Infotech");
+  const [cover, setCover] = useState<string | null>(profile?.cover || null);
+  const [logo, setLogo] = useState<string | null>(profile?.logo || null);
+  const [company, setCompany] = useState(profile?.company || "Coding Infotech");
 
   const handleImageUpload = (
     e: React.ChangeEvent<HTMLInputElement>,

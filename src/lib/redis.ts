@@ -9,19 +9,25 @@ let redis: Redis | null = null;
 const redisUrl = getRedisUrl();
 if (redisUrl) {
   redis = new Redis(redisUrl, {
-    // Prevent hanging connections
     connectTimeout: 5000,
-    // Don't block if Redis is temporarily down
     enableOfflineQueue: false,
-    // Retry with backoff, max 3 times
     maxRetriesPerRequest: 2,
     lazyConnect: true,
+    retryStrategy(times) {
+      if (times > 3) {
+        console.warn("[Redis] Maximum reconnection attempts reached. Redis connection disabled (using in-memory cache fallback).");
+        return null;
+      }
+      return Math.min(times * 500, 2000);
+    }
   });
 
   redis.on('error', (err) => {
     // Log but don't crash — we fall back to in-memory cache
-    if ((err as any).code !== 'ECONNREFUSED') {
-      console.warn('[Redis] Connection error (will use in-memory fallback):', err.message);
+    if (redis && redis.status !== 'end') {
+      if ((err as any).code !== 'ECONNREFUSED') {
+        console.warn('[Redis] Connection error (will use in-memory fallback):', err.message);
+      }
     }
   });
 
@@ -119,6 +125,35 @@ export async function invalidateCache(keys: string | string[]) {
       await redis.del(...keysArray);
     } catch (e) {
       console.warn(`[Redis] DEL error for keys [${keysArray.join(', ')}]:`, (e as Error).message);
+    }
+  }
+}
+
+/**
+ * Invalidate all keys matching a pattern.
+ */
+export async function invalidatePattern(pattern: string) {
+  // Clear from in-memory cache matching pattern
+  try {
+    const regexPattern = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+    for (const key of memCache.keys()) {
+      if (regexPattern.test(key)) {
+        memCache.delete(key);
+      }
+    }
+  } catch (err) {
+    console.error('[Cache] Error clearing in-memory pattern keys:', err);
+  }
+
+  // Clear from Redis if ready
+  if (redis && redis.status === 'ready') {
+    try {
+      const keys = await redis.keys(pattern);
+      if (keys.length > 0) {
+        await redis.del(...keys);
+      }
+    } catch (e) {
+      console.warn(`[Redis] Pattern DEL error for "${pattern}":`, (e as Error).message);
     }
   }
 }

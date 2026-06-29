@@ -2,6 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useCallback } from "react";
 import { getSocket } from "@/socket/socket";
+import { usePathname, useSearchParams } from "next/navigation";
 
 export interface NotificationMeta {
     jobId?: string | null;
@@ -39,8 +40,56 @@ interface UseNotificationsReturn {
     deleteNotification: (id: string) => void;
 }
 
+function matchesCurrentPage(n: Notification, pathname: string, searchParams: any) {
+    if (n.isRead) return false;
+
+    // 1. Check by chatId
+    const chatId = searchParams.get("chatId");
+    if (chatId && n.meta?.chatId === chatId) {
+        return true;
+    }
+
+    // 2. Check by jobId (covers recommended jobs, project detail pages, and client dashboard current jobs)
+    const jobId = searchParams.get("jobId") || pathname.split("/").pop();
+    if (jobId && n.meta?.jobId === jobId) {
+        return true;
+    }
+
+    // 3. Check by tab (covers freelancer-dashboard tabs)
+    if (pathname === "/freelancer-dashboard") {
+        const tab = searchParams.get("tab") || "overview";
+        if (n.type === "job_invite" && tab === "invitations") return true;
+        if (n.type === "proposal_update" && tab === "current") return true;
+        if (n.type === "review" && tab === "overview") return true;
+    }
+
+    // 4. Check by exact link matching (excluding query params or checking full link)
+    if (n.link) {
+        try {
+            const nUrl = new URL(n.link, "http://localhost");
+            if (nUrl.pathname === pathname) {
+                let paramsMatch = true;
+                nUrl.searchParams.forEach((val, key) => {
+                    if (searchParams.get(key) !== val) {
+                        paramsMatch = false;
+                    }
+                });
+                if (paramsMatch) return true;
+            }
+        } catch {
+            if (n.link === pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "")) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 export function useNotifications(userId: string | undefined): UseNotificationsReturn {
     const queryClient = useQueryClient();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
 
     const { data: notifications = [], isLoading: loading, error, refetch } = useQuery<Notification[]>({
         queryKey: ["notifications", userId],
@@ -48,20 +97,6 @@ export function useNotifications(userId: string | undefined): UseNotificationsRe
             const res = await fetch("/api/notifications?limit=30");
             const data = await res.json();
             if (!data.success) throw new Error(data.error || "Failed to fetch");
-            
-            // Auto-mark as read for active chat if needed (legacy logic)
-            if (typeof window !== "undefined") {
-                const urlParams = new URLSearchParams(window.location.search);
-                const activeChatId = urlParams.get("chatId");
-                if (activeChatId) {
-                    data.notifications.forEach((n: Notification) => {
-                        if (!n._id) return;
-                        if (!n.isRead && n.type === "message" && n.meta?.chatId === activeChatId) {
-                            fetch(`/api/notifications/${n._id}`, { method: "PATCH" }).catch(() => { });
-                        }
-                    });
-                }
-            }
             return data.notifications;
         },
         enabled: !!userId,
@@ -87,9 +122,36 @@ export function useNotifications(userId: string | undefined): UseNotificationsRe
         }
     });
 
+    useEffect(() => {
+        if (!userId || !notifications.length) return;
+
+        notifications.forEach((n) => {
+            if (matchesCurrentPage(n, pathname, searchParams)) {
+                markAsReadMutation.mutate(n._id);
+            }
+        });
+    }, [pathname, searchParams, notifications, userId]);
+
     const markAllAsReadMutation = useMutation({
         mutationFn: async () => {
-            await fetch("/api/notifications", { method: "PUT" });
+            const res = await fetch("/api/notifications", { method: "PUT" });
+            if (!res.ok) {
+                throw new Error("Failed to mark all notifications as read");
+            }
+            return res.json();
+        },
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ["notifications", userId] });
+            const previous = queryClient.getQueryData(["notifications", userId]);
+            queryClient.setQueryData(["notifications", userId], (old: Notification[] | undefined) => 
+                old?.map(n => ({ ...n, isRead: true }))
+            );
+            return { previous };
+        },
+        onError: (err, variables, context) => {
+            if (context?.previous) {
+                queryClient.setQueryData(["notifications", userId], context.previous);
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["notifications", userId] });

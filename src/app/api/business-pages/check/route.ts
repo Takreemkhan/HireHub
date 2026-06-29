@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import clientPromise, { DB_NAME, COLLECTIONS } from "@/lib/mongodb";
 
 export async function GET(req: Request) {
-  const session = await getServerSession(authOptions as any);
+  const session = (await getServerSession(authOptions as any)) as any;
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

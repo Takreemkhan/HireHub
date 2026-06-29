@@ -71,7 +71,7 @@ export default function FileUpload({
 
     // ✅ documentType check
     if (!documentType) {
-      setMessage({ type: "error", text: "❌ Pehle document type select karo" });
+      setMessage({ type: "error", text: "❌ Please select a document type first" });
       return;
     }
     if (selectedFiles.length > maxFiles) {
@@ -107,7 +107,7 @@ export default function FileUpload({
 
   // ── Delete ─────────────────────────────────────────────────────
   const handleDelete = async (fileId: string, fileName: string) => {
-    if (!confirm(`"${fileName}" delete karein?`)) return;
+    if (!confirm(`Are you sure you want to delete "${fileName}"?`)) return;
     setDeletingId(fileId);
     try {
       const res  = await fetch(`/api/client/${userId}/files?fileId=${fileId}`, { method: "DELETE" });
@@ -142,10 +142,10 @@ export default function FileUpload({
 
   const getStatusBadge = (status: string, rejectionReason?: string) => {
     switch (status) {
-      case "pending":      return { bg: "bg-yellow-100", text: "text-yellow-800", label: "Pending",      icon: "⏳", message: "Document review mein jayega 24-48 hours mein." };
-      case "under_review": return { bg: "bg-blue-100",   text: "text-blue-800",   label: "Under Review", icon: "🔍", message: "Aapka document review ho raha hai." };
-      case "approved":     return { bg: "bg-green-100",  text: "text-green-800",  label: "Approved",     icon: "✅", message: "Document verified ho gaya!" };
-      case "rejected":     return { bg: "bg-red-100",    text: "text-red-800",    label: "Rejected",     icon: "❌", message: rejectionReason || "Document reject hua." };
+      case "pending":      return { bg: "bg-yellow-100", text: "text-yellow-800", label: "Pending",      icon: "⏳", message: "Your document will be reviewed within 24-48 hours." };
+      case "under_review": return { bg: "bg-blue-100",   text: "text-blue-800",   label: "Under Review", icon: "🔍", message: "Your document is currently under review." };
+      case "approved":     return { bg: "bg-green-100",  text: "text-green-800",  label: "Approved",     icon: "✅", message: "Document verified successfully!" };
+      case "rejected":     return { bg: "bg-red-100",    text: "text-red-800",    label: "Rejected",     icon: "❌", message: rejectionReason || "Document was rejected." };
       default:             return { bg: "bg-gray-100",   text: "text-gray-800",   label: "Unknown",      icon: "❓", message: "" };
     }
   };
@@ -161,7 +161,7 @@ export default function FileUpload({
           {/* Step 1 — Document type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Step 1 — Document type select karo <span className="text-red-500">*</span>
+              Step 1 — Select document type <span className="text-red-500">*</span>
             </label>
             <select
               value={documentType}
@@ -178,7 +178,7 @@ export default function FileUpload({
           {/* Step 2 — File input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Step 2 — File upload karo <span className="text-red-500">*</span>
+              Step 2 — Upload file <span className="text-red-500">*</span>
             </label>
             <input
               type="file"
@@ -192,7 +192,7 @@ export default function FileUpload({
                 hover:file:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             {!documentType && (
-              <p className="text-xs text-orange-500 mt-1">⚠️ Pehle document type select karo</p>
+              <p className="text-xs text-orange-500 mt-1">⚠️ Please select a document type first</p>
             )}
             <p className="text-xs text-gray-400 mt-1">Accepted: JPEG, PNG, PDF · Max 10MB</p>
           </div>

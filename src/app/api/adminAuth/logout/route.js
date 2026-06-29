@@ -7,7 +7,7 @@ export async function POST() {
       message: "Logged out successfully",
     });
 
-    // Clear admin_token cookie (agar cookie-based auth use ho)
+    // Clear admin_token cookie (if cookie-based auth is used)
     response.cookies.set("admin_token", "", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

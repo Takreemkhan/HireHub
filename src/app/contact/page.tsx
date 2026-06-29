@@ -14,6 +14,7 @@ export default function ContactPage() {
   });
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -25,6 +26,7 @@ export default function ContactPage() {
 
   const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
+    setError(null);
     if (
       !formData.name ||
       !formData.email ||
@@ -36,9 +38,27 @@ export default function ContactPage() {
       return;
     }
     setLoading(true);
-    await new Promise((res) => setTimeout(res, 1200));
-    setLoading(false);
-    setSubmitted(true);
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSubmitted(true);
+      } else {
+        setError(data.error || "Failed to send message. Please try again.");
+      }
+    } catch (err: any) {
+      console.error("Error submitting contact form:", err);
+      setError("An unexpected error occurred. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -355,6 +375,12 @@ export default function ContactPage() {
                         The more detail you provide, the faster we can help.
                       </p>
                     </div>
+
+                    {error && (
+                      <div className="text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-3 rounded-lg text-center font-medium">
+                        {error}
+                      </div>
+                    )}
 
                     {/* Submit */}
                     <button

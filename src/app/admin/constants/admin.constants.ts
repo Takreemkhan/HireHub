@@ -11,7 +11,7 @@ import type { User, DocumentStatus, StatCard } from "../types/admin.types";
 
 export const MOCK_USERS: User[] = [
   {
-    id: 1,
+    id: "1",
     name: "Arjun Sharma",
     email: "arjun.sharma@gmail.com",
     contact: "+91 98765 43210",
@@ -20,9 +20,15 @@ export const MOCK_USERS: User[] = [
     role: "freelancer",
     joinedDate: "12 Jan 2025",
     avatar: "A",
+    documentId: null,
+    documentUrl: null,
+    rejectionReason: null,
+    uploadDate: "",
+    hasDocument: false,
+    isBlocked: false
   },
   {
-    id: 2,
+    id: "2",
     name: "Priya Mehta",
     email: "priya.mehta@outlook.com",
     contact: "+91 87654 32109",
@@ -31,9 +37,15 @@ export const MOCK_USERS: User[] = [
     role: "client",
     joinedDate: "05 Feb 2025",
     avatar: "P",
+    documentId: null,
+    documentUrl: null,
+    rejectionReason: null,
+    uploadDate: "",
+    hasDocument: false,
+    isBlocked: false
   },
   {
-    id: 3,
+    id: "3",
     name: "Rohan Verma",
     email: "rohan.v@yahoo.com",
     contact: "+91 76543 21098",
@@ -42,9 +54,15 @@ export const MOCK_USERS: User[] = [
     role: "freelancer",
     joinedDate: "19 Feb 2025",
     avatar: "R",
+    documentId: null,
+    documentUrl: null,
+    rejectionReason: null,
+    uploadDate: "",
+    hasDocument: false,
+    isBlocked: false
   },
   {
-    id: 4,
+    id: "4",
     name: "Sneha Patel",
     email: "sneha.patel@gmail.com",
     contact: "+91 65432 10987",
@@ -53,9 +71,15 @@ export const MOCK_USERS: User[] = [
     role: "client",
     joinedDate: "28 Feb 2025",
     avatar: "S",
+    documentId: null,
+    documentUrl: null,
+    rejectionReason: null,
+    uploadDate: "",
+    hasDocument: false,
+    isBlocked: false
   },
   {
-    id: 5,
+    id: "5",
     name: "Karan Singh",
     email: "karan.singh@proton.me",
     contact: "+91 54321 09876",
@@ -64,9 +88,15 @@ export const MOCK_USERS: User[] = [
     role: "freelancer",
     joinedDate: "03 Mar 2025",
     avatar: "K",
+    documentId: null,
+    documentUrl: null,
+    rejectionReason: null,
+    uploadDate: "",
+    hasDocument: false,
+    isBlocked: false
   },
   {
-    id: 6,
+    id: "6",
     name: "Divya Nair",
     email: "divya.nair@gmail.com",
     contact: "+91 43210 98765",
@@ -75,6 +105,12 @@ export const MOCK_USERS: User[] = [
     role: "client",
     joinedDate: "10 Mar 2025",
     avatar: "D",
+    documentId: null,
+    documentUrl: null,
+    rejectionReason: null,
+    uploadDate: "",
+    hasDocument: false,
+    isBlocked: false
   },
 ];
 

@@ -3,11 +3,11 @@
 
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import clientPromise, { DB_NAME } from "@/lib/mongodb";
 import { verifyAuth } from "@/lib/auth.middleware";
 import { ObjectId } from "mongodb";
-import { getOrSetCache, invalidateCache, redis } from "@/lib/redis";
+import { getOrSetCache, invalidateCache, invalidatePattern } from "@/lib/redis";
 
 const COLLECTION = "notifications";
 
@@ -119,12 +119,7 @@ export async function PUT(req) {
 
         // Invalidate notifications cache for this user
         await invalidateCache([`api:notifications:unread:${userId}`]);
-        if (redis) {
-            const keys = await redis.keys(`api:notifications:list:${userId}:*`);
-            if (keys.length > 0) {
-                await redis.del(...keys);
-            }
-        }
+        await invalidatePattern(`api:notifications:list:${userId}:*`);
 
         return NextResponse.json({ success: true, message: chatId ? "Chat notifications marked as read" : "All notifications marked as read" });
     } catch (error) {

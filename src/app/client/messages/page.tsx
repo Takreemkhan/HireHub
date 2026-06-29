@@ -122,8 +122,8 @@ export default function ClientMessagesPage() {
   }
 
   return (
-    // ✅ FIX: fixed position — header (64px) ke neeche se shuru, footer hide karo
-    // h-screen nahi use karo — layout mein header aur footer bhi hain
+    // ✅ FIX: fixed position — start below header (64px), hide footer
+    // do not use h-screen — layout also has header and footer
     <div className="fixed top-16 inset-x-0 bottom-0 overflow-hidden bg-white z-10">
       <Suspense fallback={
         <div className="flex items-center justify-center h-full">

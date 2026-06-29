@@ -70,12 +70,12 @@ export async function POST(req) {
       refreshToken,
     });
 
-    // ⭐ Cookie set karo middleware ke liye (httpOnly = secure)
+    // Set cookie for middleware (httpOnly = secure)
     response.cookies.set("admin_token", adminToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60, // 7 din
+      maxAge: 7 * 24 * 60 * 60, // 7 days
       path: "/",
     });
 

@@ -9,7 +9,7 @@ import Logo from "@/components/ui/Logo";
 
 // ============================================================
 // 🔐 AES-GCM Encryption helpers (Web Crypto API - browser built-in)
-// Password browser mein sirf encrypted ciphertext ke roop mein stored hota hai
+// Password is only stored as encrypted ciphertext in the browser
 // ============================================================
 const CRYPTO_KEY_MATERIAL = "flh-rmb-k-v1"; // key seed — change to invalidate old stored data
 
@@ -36,7 +36,7 @@ async function encryptPassword(plain: string): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(plain);
   const cipherBuf = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoded);
-  // iv + ciphertext ko base64 mein pack karo
+  // Pack iv + ciphertext into base64
   const combined = new Uint8Array(iv.byteLength + cipherBuf.byteLength);
   combined.set(iv, 0);
   combined.set(new Uint8Array(cipherBuf), iv.byteLength);
@@ -70,7 +70,7 @@ function SigninPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // ✅ Remember Me: Page load pe saved email + encrypted password restore karo
+  // ✅ Remember Me: Restore saved email + encrypted password on page load
   useEffect(() => {
     const savedEmail = localStorage.getItem("rememberedEmail");
     const savedCipher = localStorage.getItem("rememberedPwdEnc");
@@ -158,7 +158,7 @@ function SigninPageContent() {
     setLoginError("");
 
     try {
-      // ✅ Pehle block check karo
+      // ✅ First check if user is blocked
       const checkRes = await fetch("/api/auth/custom-signin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -174,11 +174,11 @@ function SigninPageContent() {
         return;
       }
 
-      // ✅ Remember Me: Email plain text, Password AES-GCM encrypted store karo
+      // ✅ Remember Me: Store email as plain text and password encrypted with AES-GCM
       if (rememberMe) {
         localStorage.setItem("rememberedEmail", email);
         const cipher = await encryptPassword(password);
-        localStorage.setItem("rememberedPwdEnc", cipher); // browser mein sirf gibberish dikhega
+        localStorage.setItem("rememberedPwdEnc", cipher); // Only gibberish will be visible in the browser
       } else {
         localStorage.removeItem("rememberedEmail");
         localStorage.removeItem("rememberedPwdEnc");
@@ -186,7 +186,7 @@ function SigninPageContent() {
       }
 
       // ✅ remember ko String mein convert karke pass karo
-      // NextAuth credentials provider mein sab kuch string hota hai
+      // NextAuth credentials provider is strictly string-based
       const result = await signIn("credentials", {
         email,
         password,

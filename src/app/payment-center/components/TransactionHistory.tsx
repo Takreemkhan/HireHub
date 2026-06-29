@@ -17,7 +17,7 @@ interface Transaction {
   businessPageName: string | null;
 }
 
-const TransactionHistory = ({ viewMode = 'all' }: { viewMode?: 'all' | 'freelancer' | 'business' }) => {
+const TransactionHistory = ({ viewMode = 'all' }: { viewMode?: 'all' | 'freelancer' | 'business' | 'client' }) => {
   const [filter, setFilter] = useState<'all' | 'received' | 'withdrawn'>('all');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);

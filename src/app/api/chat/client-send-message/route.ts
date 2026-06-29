@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     const receiverUser = await users.findOne({ email: toUserId.toLowerCase() });
     if (!receiverUser) {
       return NextResponse.json(
-        { error: `"${toUserId}" se koi user nahi mila. Email dobara check karo.` },
+        { error: `No user found with "${toUserId}". Please check the email again.` },
         { status: 404 }
       );
     }
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
 
   if (fromUserId === toUserId) {
     return NextResponse.json(
-      { error: "Aap khud ko request nahi bhej sakte" },
+      { error: "You cannot send a request to yourself" },
       { status: 400 }
     );
   }

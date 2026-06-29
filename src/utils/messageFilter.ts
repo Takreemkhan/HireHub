@@ -129,7 +129,7 @@ export function filterMessage(content: string): FilterResult {
             return {
                 blocked: true,
                 reason:
-                    "🎥 Meeting links share karna allowed nahi hai. Platform ke through hi kaam karein.",
+                    "🎥 Sharing meeting links is not allowed. Please collaborate only through the platform.",
             };
         }
         pattern.lastIndex = 0;
@@ -141,7 +141,7 @@ export function filterMessage(content: string): FilterResult {
         return {
             blocked: true,
             reason:
-                "📞 Contact number share karna is platform par allowed nahi hai. Platform ke through hi contact karein.",
+                "📞 Sharing contact numbers is not allowed on this platform. Please contact only through the platform.",
         };
     }
 

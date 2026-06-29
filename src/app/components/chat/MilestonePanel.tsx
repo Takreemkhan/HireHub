@@ -288,14 +288,14 @@ export default function MilestonePanel({
             {/* ── Panel header ───────────────────────────────── */}
             <button
                 onClick={() => setCollapsed(!collapsed)}
-                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-100 transition-colors"
+                className="w-full flex items-center justify-between px-4 py-3 bg-emerald-50/50 hover:bg-emerald-50/80 transition-colors border-b border-emerald-100/50"
             >
                 <div className="flex items-center gap-2">
                     <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
-                    <span className="text-sm font-semibold text-gray-800">
-                        Milestones {milestones.length > 0 && <span className="text-gray-500">· {milestones.length}</span>}
+                    <span className="text-sm font-semibold text-emerald-800">
+                        Milestones {milestones.length > 0 && <span className="text-emerald-600/70">· {milestones.length}</span>}
                     </span>
                     {badgeCount > 0 && (
                         <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${isClient ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
@@ -303,13 +303,13 @@ export default function MilestonePanel({
                         </span>
                     )}
                 </div>
-                <svg className={`w-4 h-4 text-gray-400 transition-transform ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className={`w-5 h-5 text-emerald-600 hover:text-emerald-800 transition-transform ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
                 </svg>
             </button>
 
             {!collapsed && (
-                <div className="px-4 pb-4 space-y-3 overflow-y-auto flex-1 scrollbar-hide" style={{ overscrollBehavior: 'contain' }}>
+                <div className="px-4 pt-4 pb-4 space-y-3 overflow-y-auto flex-1 scrollbar-hide" style={{ overscrollBehavior: 'contain' }}>
 
                     {loading && (
                         <div className="py-2 space-y-3">

@@ -98,19 +98,23 @@ export default function UserTable({ users, total, filters, onSearchChange, onSta
     },
     {
       key: "actions", header: "Actions",
-      render: (u) => (
-        <div className="opacity-0 group-hover:opacity-100 transition">
-          <ActionMenu
-            user={u}
-            isOpen={openId === u.id}
-            onToggle={() => toggle(u.id)}
-            onClose={close}
-            onView={onView}
-            onDelete={onDelete}
-            menuItems={extraMenuItems}
-          />
-        </div>
-      ),
+      render: (u, idx) => {
+        const isBottom = idx >= users.length - 2 && users.length > 2;
+        return (
+          <div className="opacity-0 group-hover:opacity-100 transition">
+            <ActionMenu
+              user={u}
+              isOpen={openId === u.id}
+              onToggle={() => toggle(u.id)}
+              onClose={close}
+              onView={onView}
+              onDelete={onDelete}
+              menuItems={extraMenuItems}
+              dropUp={isBottom}
+            />
+          </div>
+        );
+      },
     },
   ];
 
@@ -125,7 +129,7 @@ export default function UserTable({ users, total, filters, onSearchChange, onSta
         <TableFilters filters={filters} onSearchChange={onSearchChange} onStatusChange={onStatusChange} onRoleChange={onRoleChange} onExport={onExport} />
       </div>
 
-      <UserDataTable columns={columns} rows={users} keyExtractor={(u) => u.id} emptyMessage="Koi user nahi mila" />
+      <UserDataTable columns={columns} rows={users} keyExtractor={(u) => u.id} emptyMessage="No users found" />
 
       <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
         <span>Showing {users.length} of {total} users</span>

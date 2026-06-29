@@ -40,7 +40,7 @@ const statusConfig = {
 };
 
 
-export default function WalletSection({ viewMode = 'all' }: { viewMode?: 'all' | 'freelancer' | 'business' }) {
+export default function WalletSection({ viewMode = 'all' }: { viewMode?: 'all' | 'freelancer' | 'business' | 'client' }) {
     const { data: session } = useSession();
     const isFreelancer = session?.user?.role === 'freelancer';
     const [razorpayReady, setRazorpayReady] = useState(false);

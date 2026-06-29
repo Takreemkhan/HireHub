@@ -459,8 +459,8 @@ export default function ChatPage({ userId }: ChatPageProps) {
     socket.on("user:status_change", handleStatusChange);
     socket.on("user:status_response", handleStatusResponse);
     return () => {
-      socket.off("chat:accepted");
-      socket.off("message:received");
+      socket.off("chat:accepted", handleChatAccepted);
+      socket.off("message:received", handleMessageReceived);
       socket.off("user:status_change", handleStatusChange);
       socket.off("user:status_response", handleStatusResponse);
     };

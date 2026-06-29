@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyAccessToken, verifyRefreshToken, generateAccessToken } from "@/lib/jwt";
 
-// Routes jo bina login ke accessible hain
+// Publicly accessible routes
 const PUBLIC_ROUTES = [
   "/api/auth/login",
   "/api/auth/register",
@@ -29,7 +29,7 @@ export function middleware(request) {
   // No tokens at all
   if (!accessToken && !refreshToken) {
     return NextResponse.json(
-      { success: false, message: "Please login karein." },
+      { success: false, message: "Please log in." },
       { status: 401 }
     );
   }
@@ -63,7 +63,7 @@ export function middleware(request) {
   }
 
   return NextResponse.json(
-    { success: false, message: "Session expire ho gaya. Please dobara login karein." },
+    { success: false, message: "Session expired. Please log in again." },
     { status: 401 }
   );
 }

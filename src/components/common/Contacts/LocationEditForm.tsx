@@ -49,7 +49,7 @@ export default function LocationEditForm({
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-        // Phone badla → verify dobara karni padegi
+        // Phone changed → needs verification again
         if (name === 'phone' && value !== initialData?.phone) {
             setPhoneState('idle');
             setOtp('');
@@ -61,7 +61,7 @@ export default function LocationEditForm({
     const handleSendOtp = async () => {
         const phone = formData.phone.trim();
         if (!/^\d{10}$/.test(phone)) {
-            setOtpError('10-digit phone number enter karo (no spaces, no +91)');
+            setOtpError('Please enter a 10-digit phone number (no spaces, no +91)');
             return;
         }
         setOtpError('');
@@ -84,10 +84,10 @@ export default function LocationEditForm({
                     });
                 }, 1000);
             } else {
-                setOtpError(data.message || 'OTP send karne mein error aaya');
+                setOtpError(data.message || 'Error occurred while sending OTP');
             }
         } catch {
-            setOtpError('Network error. Dobara try karo.');
+            setOtpError('Network error. Please try again.');
         } finally {
             setOtpLoading(false);
         }
@@ -96,7 +96,7 @@ export default function LocationEditForm({
     // ── OTP verify karo ───────────────────────────────────────────────
     const handleVerifyOtp = async () => {
         if (otp.length !== 6) {
-            setOtpError('6-digit OTP enter karo');
+            setOtpError('Please enter a 6-digit OTP');
             return;
         }
         setOtpError('');
@@ -115,7 +115,7 @@ export default function LocationEditForm({
                 setOtpError(data.message || 'Invalid OTP');
             }
         } catch {
-            setOtpError('Network error. Dobara try karo.');
+            setOtpError('Network error. Please try again.');
         } finally {
             setOtpLoading(false);
         }
@@ -264,7 +264,7 @@ export default function LocationEditForm({
                         <div className="max-w-md space-y-2 animate-in fade-in duration-200">
                             <div className="flex items-center gap-2 text-xs text-gray-500">
                                 <FiShield size={13} className="text-orange-500" />
-                                <span>OTP +91 {formData.phone}Sent to your phone. It will expire in 10 minutes</span>
+                                <span>OTP sent to your phone +91 {formData.phone}. It will expire in 10 minutes</span>
                             </div>
                             <div className="flex gap-2">
                                 <input

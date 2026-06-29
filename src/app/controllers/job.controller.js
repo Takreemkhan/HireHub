@@ -71,14 +71,14 @@ export const deleteJobById = async (jobId) => {
 
 
 // GET ALL JOBS FOR FREELANCER
-// ✅ OPTIMIZED: Pehle 41 queries the (20 jobs x 2 + 1), ab sirf 2 queries hain
-// MongoDB $lookup se saari client info ek hi query mein aati hai
+// ✅ OPTIMIZED: Previously had 41 queries (20 jobs x 2 + 1), now has only 2 queries
+// MongoDB $lookup fetches all client info in a single query
 export const getAllJobsForFreelancer = async (filters = {}) => {
 
   const client = await clientPromise;
   const db = client.db(DB_NAME);
 
-  // Step 1: Match filter banao (same as before)
+  // Step 1: Create the match filter query
   const matchQuery = {
     status: "open",
     jobVisibility: "public",
@@ -127,9 +127,9 @@ export const getAllJobsForFreelancer = async (filters = {}) => {
     : { createdAt: -1, ...sortOptions };
   const finalSort = { _featuredActive: -1, ...featuredSort };
 
-  // Step 4: EK hi aggregation query mein sab kuch
-  // Pehle: 1 job fetch + 1 user fetch + 1 proposal count = 3 queries PER JOB (20 jobs = 60 queries)
-  // Ab:    Sab kuch ek pipeline mein = sirf 1 query total
+  // Step 4: Everything in a single aggregation query
+  // Previously: 1 job fetch + 1 user fetch + 1 proposal count = 3 queries per job (20 jobs = 60 queries)
+  // Now: Everything in one pipeline = only 1 query total
   const pipeline = [
     { $match: matchQuery },
 
@@ -147,7 +147,7 @@ export const getAllJobsForFreelancer = async (filters = {}) => {
 
     { $sort: finalSort },
 
-    // Total count ke liye facet use karo (pagination + data dono ek saath)
+    // Use $facet for total count (both pagination and data together)
     {
       $facet: {
         metadata: [{ $count: "total" }],
@@ -155,7 +155,7 @@ export const getAllJobsForFreelancer = async (filters = {}) => {
           { $skip: skip },
           { $limit: limit },
 
-          // clientId string ho sakti hai ya ObjectId — dono handle karo
+          // clientId can be a string or ObjectId — handle both
           {
             $addFields: {
               clientIdObj: {
@@ -168,7 +168,7 @@ export const getAllJobsForFreelancer = async (filters = {}) => {
             }
           },
 
-          // ✅ $lookup: Users collection se client info EK saath lao
+          // ✅ $lookup: Retrieve client info from users collection together
           {
             $lookup: {
               from: COLLECTIONS.USERS,
@@ -181,7 +181,7 @@ export const getAllJobsForFreelancer = async (filters = {}) => {
             }
           },
 
-          // ✅ $lookup: Proposals collection se count lao
+          // ✅ $lookup: Retrieve count from proposals collection
           {
             $lookup: {
               from: COLLECTIONS.PROPOSALS,
@@ -195,7 +195,7 @@ export const getAllJobsForFreelancer = async (filters = {}) => {
             }
           },
 
-          // Data clean karo — final shape banao
+          // Clean up data — construct the final shape
           {
             $addFields: {
               clientInfo: {
@@ -214,20 +214,20 @@ export const getAllJobsForFreelancer = async (filters = {}) => {
             }
           },
 
-          // Temp fields hatao
+          // Remove temporary fields
           { $project: { clientData: 0, proposalDocs: 0, clientIdObj: 0, _featuredActive: 0 } }
         ]
       }
     }
   ];
 
-  // ✅ Sirf 1 DB call — pehle 41+ calls tha!
+  // ✅ Only 1 DB call — previously was 41+ calls!
   const [result] = await db.collection(COLLECTIONS.JOBS).aggregate(pipeline).toArray();
 
   const total = result.metadata[0]?.total || 0;
   const rawJobs = result.jobs || [];
 
-  // timePosted calculate karo (DB se nahi, JS mein — sahi hai)
+  // Calculate timePosted in JS (not from DB)
   const enhancedJobs = rawJobs.map((job) => ({
     ...job,
     timePosted: calculateTimeAgo(job.createdAt)

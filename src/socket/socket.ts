@@ -5,16 +5,16 @@ let socket: Socket | null = null;
 // ================================================================
 // FILE: src/socket/socket.ts  (CLIENT SIDE)
 //
-// PEHLE KA PROBLEM:
-//   - Reconnection logic bilkul nahi tha
-//   - Connection fail ho toh app hang ho jaati thi
-//   - "user:join" emit ho jaata tha CONNECT hone SE PEHLE
-//     (race condition — server ko user pata nahi chalta)
+// PREVIOUS ISSUES:
+//   - No reconnection logic existed
+//   - App would freeze if connection failed
+//   - "user:join" was emitted BEFORE connecting
+//     (race condition — server did not detect user)
 //
-// AB KYA FIXED HAI:
-//   - Auto reconnection ON hai (5 baar try karega)
-//   - Error aaye toh gracefully handle hoga, crash nahi
-//   - "user:join" sirf tab emit hoga jab connection PAKKA ho
+// WHAT IS FIXED NOW:
+//   - Auto reconnection is enabled (will retry 5 times)
+//   - Errors are handled gracefully without crashing
+//   - "user:join" is only emitted once the connection is confirmed
 // ================================================================
 
 export const getSocket = (): Socket => {
@@ -22,22 +22,26 @@ export const getSocket = (): Socket => {
     socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001", {
       autoConnect: false,
 
-      // ✅ FIX 1: Reconnection logic add kiya
-      reconnection: true,          // disconnect hone pe dobara try karo
+      // ✅ FIX 1: Added reconnection logic
+      reconnection: true,          // retry on disconnect
       reconnectionAttempts: 5,     // max 5 baar try karega
       reconnectionDelay: 1000,     // pehli baar 1 second baad
       reconnectionDelayMax: 5000,  // max 5 second wait (exponential backoff)
       timeout: 10000,              // 10 second mein connect nahi hua toh fail
     });
 
-    // ✅ FIX 2: Event listeners — kya ho raha hai pata chalega
+    // ✅ FIX 2: Event listeners for better visibility
     socket.on("connect", () => {
       console.log("✅ Socket connected:", socket?.id);
+      if (socket && socket.auth && (socket.auth as any).userId) {
+        socket.emit("user:join", (socket.auth as any).userId);
+        console.log("👤 Re-joined user session on connect/reconnect:", (socket.auth as any).userId);
+      }
     });
 
     socket.on("disconnect", (reason) => {
       console.warn("⚠️ Socket disconnected:", reason);
-      // Agar server ne disconnect kiya toh manually reconnect karo
+      // If the server disconnected, manually reconnect
       if (reason === "io server disconnect") {
         socket?.connect();
       }
@@ -57,7 +61,7 @@ export const getSocket = (): Socket => {
 
     socket.on("connect_error", (error) => {
       console.warn("⚠️ Socket connection error:", error.message);
-      console.warn("💡 Chat real-time updates nahi aayenge. Socket server check karo port 3001 pe.");
+      console.warn("💡 Real-time chat updates will not be received. Check if the socket server is running on port 3001.");
     });
   }
 
@@ -67,19 +71,11 @@ export const getSocket = (): Socket => {
 export const connectSocket = (userId: string): void => {
   try {
     const sock = getSocket();
+    sock.auth = { userId };
 
     if (!sock.connected) {
       sock.connect();
-
-      // ✅ FIX 3: "user:join" sirf CONNECT hone KE BAAD emit karo
-      // Pehle yeh emit connect se pehle ho jaata tha — server ko user pata nahi chalta tha
-      sock.once("connect", () => {
-        sock.emit("user:join", userId);
-        console.log("✅ Socket connected + user joined:", userId);
-      });
-
     } else {
-      // Already connected hai toh seedha join karo
       sock.emit("user:join", userId);
       console.log("♻️ Socket already connected, user joined:", userId);
     }

@@ -152,11 +152,13 @@ export default function ChatWindow({
         socket.emit("user:join", userId);
         socket.emit("join:chat", { chatId, userId });
       };
-      if (socket.connected) joinRooms();
-      else socket.once("connect", joinRooms);
+      if (socket.connected) {
+        joinRooms();
+      }
+      socket.on("connect", joinRooms);
 
       const handleMessage = (data: any) => {
-        if (data.chatId === chatId) {
+        if (data.chatId?.toString() === chatId?.toString()) {
           setMessages((prev) => [...prev, data.message]);
           onRefreshChatsRef.current();
 
@@ -172,12 +174,12 @@ export default function ChatWindow({
         }
       };
       const handleTypingUser = (data: any) => {
-        if (data.chatId === chatId && data.userId !== userId) {
+        if (data.chatId?.toString() === chatId?.toString() && data.userId !== userId) {
           setOtherUserTyping(data.isTyping);
         }
       };
       const handleRestricted = (data: any) => {
-        if (data.chatId === chatId) {
+        if (data.chatId?.toString() === chatId?.toString()) {
           setRestrictionError(data.reason);
           setTimeout(() => setRestrictionError(null), 5000);
         }
@@ -927,6 +929,24 @@ export default function ChatWindow({
                   </div>
                 </div>
               )}
+
+              {/* If frozen/disputed, show the Conversation Frozen explanation as a system message in the chat history */}
+              {(chatStatus === "disputed" || isFrozen) && (
+                <div className="flex justify-center my-4 px-4 animate-in fade-in duration-300">
+                  <div className="bg-gradient-to-br from-[#eef2ff] to-[#e0f2fe] border border-[#c7d2fe] border-l-4 border-l-[#6366f1] rounded-[12px] px-[18px] py-[14px] max-w-[78%] shadow-[0_2px_8px_rgba(99,102,241,0.10)]">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[1rem]">🤖</span>
+                      <span className="text-[11px] font-bold tracking-wider uppercase text-[#6366f1]">
+                        System Message
+                      </span>
+                    </div>
+                    <p className="text-[14px] text-[#374151] leading-relaxed font-medium italic">
+                      This chat is temporarily locked due to an active dispute. Our moderation team is currently reviewing the case to ensure a fair resolution. Communication will resume once resolved.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div ref={messagesEndRef} />
             </div>
           )}
@@ -966,39 +986,19 @@ export default function ChatWindow({
 
         {/* ── Input Area or Frozen Banner ─────────────────────────────────────────── */}
         {(chatStatus === "disputed" || isFrozen) ? (
-          <div className="px-6 py-8 bg-white border-t border-gray-100">
-            <div className="max-w-2xl mx-auto">
-              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-50 to-white border border-gray-200 shadow-sm p-6 text-center">
-                {/* Decorative Background Elements */}
-                <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-gray-100 rounded-full blur-2xl opacity-50" />
-                <div className="absolute bottom-0 left-0 -mb-4 -ml-4 w-24 h-24 bg-gray-100 rounded-full blur-2xl opacity-50" />
-
-                <div className="relative z-10 flex flex-col items-center">
-                  <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
-                    <svg className="w-7 h-7 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                  </div>
-
-                  <h3 className="text-lg font-bold text-gray-900 mb-2 tracking-tight">Conversation Frozen</h3>
-                  <p className="text-sm text-gray-500 leading-relaxed max-w-md">
-                    This chat is temporarily locked due to an active dispute. Our moderation team is currently reviewing the case to ensure a fair resolution for both parties.
-                  </p>
-
-                  <div className="mt-6 pt-6 border-t border-gray-100 w-full flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest">
-                      <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
-                      Under Review
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-gray-400 font-medium italic">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <div className="px-6 py-5 bg-amber-50/50 border-t border-amber-100 flex-shrink-0">
+            <div className="max-w-4xl mx-auto flex items-center justify-center gap-3">
+              <div className="w-8 h-8 bg-amber-100/80 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
+                <svg className="w-4.5 h-4.5 text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
-                Communication will resume once the dispute is resolved.
+              </div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-amber-900 tracking-tight">Conversation Frozen</h3>
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 uppercase tracking-widest">
+                  <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
+                  Under Review
+                </span>
               </div>
             </div>
           </div>

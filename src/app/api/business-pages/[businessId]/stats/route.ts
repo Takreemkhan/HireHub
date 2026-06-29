@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import clientPromise, { DB_NAME, COLLECTIONS } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
@@ -10,7 +10,7 @@ import { ObjectId } from "mongodb";
  */
 export async function GET(
   _req: Request,
-  { params }: { params: { businessId: string } }
+  { params }: { params: Promise<{ businessId: string }> }
 ) {
   const session: any = await getServerSession(authOptions as any);
   if (!session?.user?.id) {
@@ -18,18 +18,19 @@ export async function GET(
   }
 
   try {
+    const { businessId } = await params;
     const db = (await clientPromise).db(DB_NAME);
 
     // Verify ownership
     const page = await db
       .collection(COLLECTIONS.BUSINESS_PAGES)
-      .findOne({ _id: new ObjectId(params.businessId) });
+      .findOne({ _id: new ObjectId(businessId) });
 
     if (!page || page.ownerId.toString() !== session.user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const bpObjId = new ObjectId(params.businessId);
+    const bpObjId = new ObjectId(businessId);
 
     // Jobs posted through this business page
     const [totalJobs, activeJobs, completedJobs] = await Promise.all([

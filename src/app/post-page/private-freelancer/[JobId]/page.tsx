@@ -472,7 +472,7 @@ function FreelancerCard({
 
                 <div className="flex justify-center items-center gap-1 mt-2 text-xs sm:text-sm">
                     ⭐ {freelancer.rating}
-                    <span className="text-gray-500">({freelancer.reviews?.length || 0})</span>
+                    <span className="text-gray-500">({freelancer.reviews || 0})</span>
                 </div>
 
                 <p className="mt-3 text-sm sm:text-base font-semibold text-gray-900">

@@ -3,6 +3,7 @@
 import { getAvatarGradient, getInitials } from "@/utils/avatarColors";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import ProposalDraw from "./ProposalDraw";
 
@@ -203,17 +204,43 @@ export default function UserProfilePanel({
 
   const [proposalDrawOpen, setProposalDrawOpen] = useState(false);
   const [filesDrawerOpen, setFilesDrawerOpen] = useState(false);
-  const [fileCount, setFileCount] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (!resolvedChatId) return;
-    fetch(`/api/chat/files?chatId=${resolvedChatId}`)
-      .then((r) => r.json())
-      .then((data) => { if (data.success) setFileCount(data.files?.length ?? 0); })
-      .catch(() => { });
-  }, [resolvedChatId]);
+  const WORKFLOW_STEPS = [
+    { key: "raised", label: "Dispute Raised" },
+    { key: "awaiting_response", label: "Awaiting Response" },
+    { key: "admin_reviewing", label: "Under Review" },
+    { key: "resolution_drafted", label: "Resolution Drafted" },
+    { key: "resolved", label: "Resolved" },
+  ];
+  const { data: activeDispute = null, isLoading: disputeLoading } = useQuery({
+    queryKey: ["dispute", "my", { chatId: resolvedChatId }],
+    queryFn: async () => {
+      if (!resolvedChatId) return null;
+      const r = await fetch(`/api/disputes/my?chatId=${resolvedChatId}`);
+      const data = await r.json();
+      if (data.success && data.data?.length > 0) {
+        return data.data.find((d: any) => d.status !== "resolved") || data.data[0];
+      }
+      return null;
+    },
+    enabled: !!resolvedChatId,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+
+  const { data: fileCount = 0 } = useQuery({
+    queryKey: ["chatFiles", resolvedChatId],
+    queryFn: async () => {
+      if (!resolvedChatId) return 0;
+      const r = await fetch(`/api/chat/files?chatId=${resolvedChatId}`);
+      const data = await r.json();
+      return data.success ? (data.files?.length ?? 0) : 0;
+    },
+    enabled: !!resolvedChatId,
+    staleTime: 1000 * 60 * 5, // 5 minutes cache
+  });
 
   useEffect(() => { console.log(chatSearch); }, [chatSearch]);
+
 
   const sections = [
     {
@@ -315,25 +342,136 @@ export default function UserProfilePanel({
               <span>View profile</span>
             </button>
           )}
-          <button
-            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-            onClick={() => {
-              if (resolvedChatId && pinnedJobId && otherUserId) {
-                const clientId = role === "client" ? currentUserId : otherUserId;
-                const freelancerId = role === "freelancer" ? currentUserId : otherUserId;
-                router.push(`/dispute?chatId=${resolvedChatId}&jobId=${pinnedJobId}&clientId=${clientId}&freelancerId=${freelancerId}`);
-              } else {
-                // If not in a specific job context, maybe just go to dispute page without params or show a toast
-                router.push('/dispute');
-              }
-            }}
-          >
-            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <span>Report an issue</span>
-          </button>
+          {/* Report Issue / View Dispute Button */}
+          {activeDispute && activeDispute.status !== "resolved" ? (
+            // Active dispute — show View Dispute button
+            <button
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded-xl transition-colors"
+              onClick={() => router.push(`/dispute/respond?disputeId=${activeDispute.id}&role=${role}`)}
+            >
+              <svg className="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span>View Dispute & Status</span>
+              <span className="ml-auto text-[9px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold uppercase">Active</span>
+            </button>
+          ) : activeDispute && activeDispute.status === "resolved" ? (
+            // Resolved dispute
+            <button
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold text-green-700 bg-green-50 border border-green-200 hover:bg-green-100 rounded-xl transition-colors"
+              onClick={() => router.push(`/dispute/respond?disputeId=${activeDispute.id}&role=${role}`)}
+            >
+              <svg className="w-4 h-4 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Dispute Resolved — View Report</span>
+            </button>
+          ) : (
+            // No dispute — show Report an issue
+            <button
+              className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+              onClick={() => {
+                if (resolvedChatId && pinnedJobId && otherUserId) {
+                  const clientId = role === "client" ? currentUserId : otherUserId;
+                  const freelancerId = role === "freelancer" ? currentUserId : otherUserId;
+                  router.push(`/dispute?chatId=${resolvedChatId}&jobId=${pinnedJobId}&clientId=${clientId}&freelancerId=${freelancerId}`);
+                } else {
+                  router.push('/dispute');
+                }
+              }}
+            >
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span>Report an issue</span>
+            </button>
+          )}
         </div>
+
+        {/* Dispute Timeline — shows when active dispute exists */}
+        {activeDispute && activeDispute.status !== "resolved" && (
+          <div className="mx-4 mb-4 rounded-2xl p-4 space-y-3 border bg-amber-50 border-amber-200">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold flex items-center gap-1.5 text-amber-800">
+                <span>⚖️ Dispute Progress</span>
+              </p>
+              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-amber-100 text-amber-700">Active</span>
+            </div>
+            <div className="space-y-1.5">
+              {WORKFLOW_STEPS.map((step, idx) => {
+                const currentIdx = WORKFLOW_STEPS.findIndex(s => s.key === activeDispute.disputeWorkflowStatus);
+                const isCompleted = idx < currentIdx;
+                const isCurrent = idx === currentIdx;
+                return (
+                  <div key={step.key} className="flex items-center gap-2.5">
+                    <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 border ${
+                      isCompleted ? "bg-green-500 border-green-500" :
+                      isCurrent ? "bg-amber-500 border-amber-500" :
+                      "bg-white border-gray-300"
+                    }`}>
+                      {isCompleted && (
+                        <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      {isCurrent && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </div>
+                    <span className={`text-[10px] font-medium ${
+                      isCurrent ? "text-amber-800 font-bold" :
+                      isCompleted ? "text-green-700" :
+                      "text-gray-400"
+                    }`}>{step.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Defendant submission: Show if they haven't submitted their response yet */}
+            {activeDispute.raisedBy !== role && (
+              ((role === "freelancer" && !activeDispute.freelancerResponse) ||
+               (role === "client" && !activeDispute.clientStatement)) && (
+                <button
+                  onClick={() => router.push(`/dispute/respond?disputeId=${activeDispute.id}&role=${role}`)}
+                  className="w-full mt-1 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-colors"
+                >
+                  Submit Your Response
+                </button>
+              )
+            )}
+
+            {/* Creator submission: Show option to add additional comments/evidence */}
+            {activeDispute.raisedBy === role && !activeDispute.creatorAdditionalEvidence && (
+              <button
+                onClick={() => router.push(`/dispute/respond?disputeId=${activeDispute.id}&role=${role}`)}
+                className="w-full mt-1 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-colors"
+              >
+                Submit Additional Evidence
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* If resolved, replace checklist with Report an issue button */}
+        {activeDispute && activeDispute.status === "resolved" && (
+          <div className="mx-4 mb-4">
+            <button
+              className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors border border-gray-200"
+              onClick={() => {
+                if (resolvedChatId && pinnedJobId && otherUserId) {
+                  const clientId = role === "client" ? currentUserId : otherUserId;
+                  const freelancerId = role === "freelancer" ? currentUserId : otherUserId;
+                  router.push(`/dispute?chatId=${resolvedChatId}&jobId=${pinnedJobId}&clientId=${clientId}&freelancerId=${freelancerId}`);
+                } else {
+                  router.push('/dispute');
+                }
+              }}
+            >
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span>Report an issue</span>
+            </button>
+          </div>
+        )}
       </div>
 
       <ProposalDraw

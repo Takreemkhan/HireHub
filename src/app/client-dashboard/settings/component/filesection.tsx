@@ -25,7 +25,7 @@ const DOC_OPTIONS: { value: DocType; label: string }[] = [
 
 const Filesection = () => {
   const { data: session, status: sessionStatus } = useSession();
-  // NextAuth session mein user.id directly available hai
+  // NextAuth session has user.id directly available
   const userId = session?.user?.id;
 
   const [selectedDocument, setSelectedDocument] = useState<DocType>('');
@@ -277,7 +277,7 @@ const Filesection = () => {
         <div>
           <p className="text-sm font-semibold text-amber-700">Under Review</p>
           <p className="text-xs text-amber-600 mt-0.5">{docLabel} · Uploaded on {uploadDate}</p>
-          <p className="text-xs text-amber-500 mt-1">Admin review mein hai. Thoda wait karein.</p>
+          <p className="text-xs text-amber-500 mt-1">Under admin review. Please wait.</p>
         </div>
       </div>
     );

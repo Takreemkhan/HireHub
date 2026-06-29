@@ -28,8 +28,9 @@ export const verifyToken = (token) => {
 };
 
 // Set cookie with token
-export const setTokenCookie = (token) => {
-  cookies().set({
+export const setTokenCookie = async (token) => {
+  const cookieStore = await cookies();
+  cookieStore.set({
     name: "admin_token",
     value: token,
     httpOnly: true,
@@ -41,11 +42,13 @@ export const setTokenCookie = (token) => {
 };
 
 // Remove token cookie
-export const removeTokenCookie = () => {
-  cookies().delete("admin_token");
+export const removeTokenCookie = async () => {
+  const cookieStore = await cookies();
+  cookieStore.delete("admin_token");
 };
 
 // Get token from cookie
-export const getTokenFromCookie = () => {
-  return cookies().get("admin_token")?.value;
+export const getTokenFromCookie = async () => {
+  const cookieStore = await cookies();
+  return cookieStore.get("admin_token")?.value;
 };

@@ -52,13 +52,13 @@ export async function GET() {
 
     const getDocTypeLabel = (doc) => {
       if (!doc) return "No Document";
-      // ✅ Pehle documentType field check karo (naye uploads mein hoga)
+      // ✅ First check the documentType field (will exist in new uploads)
       if (doc.documentType && docTypeMap[doc.documentType]) {
         return docTypeMap[doc.documentType];
       }
-      // Agar documentType field hai lekin map mein nahi
+      // If documentType exists but not in the map
       if (doc.documentType) return doc.documentType;
-      // Fallback: mime type se guess (purane records ke liye)
+      // Fallback: guess from mime type (for older records)
       const mime = doc.fileType || "";
       if (mime.includes("pdf"))   return "PDF Document";
       if (mime.includes("image")) return "Image Document";
@@ -94,7 +94,7 @@ export async function GET() {
           ? new Date(u.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
           : "—",
         documentId:       doc?._id?.toString() || null,
-        documentType:     getDocTypeLabel(doc),      // ✅ sahi label
+        documentType:     getDocTypeLabel(doc),      // ✅ correct label
         documentStatus,
         documentUrl:      doc?.url || null,
         rejectionReason:  doc?.rejectionReason || null,

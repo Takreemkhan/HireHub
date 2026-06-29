@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import clientPromise, { DB_NAME, COLLECTIONS } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
