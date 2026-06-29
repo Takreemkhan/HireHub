@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -54,7 +54,7 @@ const WORKFLOW_STEPS = [
   { key: "resolved", label: "Resolved" },
 ];
 
-export default function DisputeRespondPage() {
+function DisputeRespondPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
@@ -662,5 +662,17 @@ export default function DisputeRespondPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function DisputeRespondPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600"></div>
+      </div>
+    }>
+      <DisputeRespondPageContent />
+    </Suspense>
   );
 }
